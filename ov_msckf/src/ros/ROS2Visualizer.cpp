@@ -209,7 +209,7 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
     // Other camera Asynchronous processing
     for (int i = 2; i < _app->get_params().state_options.num_cameras; i++) {
       std::string cam_topic;
-      _node->declare_parameter<std::string>()("topic_camera" + std::to_string(i), "/cam" + std::to_string(i) + "/image_raw");
+      _node->declare_parameter<std::string>("topic_camera" + std::to_string(i), "/cam" + std::to_string(i) + "/image_raw");
       _node->get_parameter("topic_camera" + std::to_string(i), cam_topic);
       parser->parse_external("relative_config_imucam", "cam" + std::to_string(i), "rostopic", cam_topic);
 
