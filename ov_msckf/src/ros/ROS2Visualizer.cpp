@@ -178,6 +178,7 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
   bool use_imav_setup = false;
   _node->declare_parameter<bool>("use_imav_setup", false);
   _node->get_parameter("use_imav_setup", use_imav_setup);
+  parser->parse_config("use_imav_setup", use_imav_setup, false);
 
   if (use_imav_setup) {
     PRINT_INFO(GREEN"[IMAV-2026] Activating Heterogeneous Sensors: D435i (Stereo+Depth) + Downward Camera\n" RESET);

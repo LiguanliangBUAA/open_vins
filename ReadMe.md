@@ -187,5 +187,5 @@ You must preserve the copyright and license notices in your derivative work and 
 Compile command:
 
 ```bash
-MAKEFLAGS="-j2" colcon build --packages-select ov_msckf --symlink-install --executor sequential
+MAKEFLAGS="-j2" colcon build --symlink-install --executor sequential --cmake-args -DCMAKE_BUILD_TYPE=RELEASE
 ```
