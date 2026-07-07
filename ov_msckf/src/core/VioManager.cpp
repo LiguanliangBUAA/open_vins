@@ -257,7 +257,7 @@ void VioManager::track_image_and_update(const ov_core::CameraData &message_const
 
   // Start timing
   rT1 = boost::posix_time::microsec_clock::local_time();
-
+  PRINT_INFO("depths size = %zu, empty = %d\n", message.depths.size(), message.depths.empty() ? 1 : (message.depths[0].empty() ? 1 : 0));
   // Assert we have valid measurement data and ids
   assert(!message_const.sensor_ids.empty());
   assert(message_const.sensor_ids.size() == message_const.images.size());
