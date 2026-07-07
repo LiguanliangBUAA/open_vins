@@ -174,6 +174,52 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
                                                               std::bind(&ROS2Visualizer::callback_inertial, this, std::placeholders::_1));
   PRINT_INFO("subscribing to IMU: %s\n", topic_imu.c_str());
 
+  // IMAV setup
+  bool use_imav_setup = false;
+  _node->declare_parameter<bool>("use_imav_setup", false);
+  _node->get_parameter("use_imav_setup", use_imav_setup);
+
+  if (use_imav_setup) {
+    PRINT_INFO(GREEN"[IMAV-2026] Activating Heterogeneous Sensors: D435i (Stereo+Depth) + Downward Camera\n" RESET);
+
+    std::string cam_topic0, cam_topic1, depth_topic;
+    _node->declare_parameter<std::string>("topic_camera0", "/cam0/image_raw");
+    _node->get_parameter("topic_camera0", cam_topic0);
+    _node->declare_parameter<std::string>("topic_camera1", "/cam1/image_raw");
+    _node->get_parameter("topic_camera1", cam_topic1);
+    // Depth topic
+    _node->declare_parameter<std::string>("topic_depth", "/depth/image_raw");
+    _node->get_parameter("topic_depth", depth_topic);
+
+    parser->parse_external("relative_config_imucam", "cam0", "rostopic", cam_topic0);
+    parser->parse_external("relative_config_imucam", "cam1", "rostopic", cam_topic1);
+    // Create sync filter
+    auto image_sub0 = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(_node, cam_topic0);
+    auto image_sub1 = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(_node, cam_topic1);
+    sub_stereo_depth = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(_node, depth_topic);
+    sync_stereo_depth = std::make_shared<message_filters::Synchronizer<sync_pol_depth>>(
+      sync_pol_depth(10), *image_sub0, *image_sub1, *sub_stereo_depth);
+    sync_stereo_depth->registerCallback(std::bind(&ROS2Visualizer::callback_stereo_depth, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, 0, 1));
+
+    sync_subs_cam.push_back(image_sub0);
+    sync_subs_cam.push_back(image_sub1);
+
+    PRINT_INFO("  -> Syncing D435i Front: %s, %s, %s\n", cam_topic0.c_str(), cam_topic1.c_str(), depth_topic.c_str());
+
+    // Other camera Asynchronous processing
+    for (int i = 2; i < _app->get_params().state_options.num_cameras; i++) {
+      std::string cam_topic;
+      _node->declare_parameter<std::string>()("topic_camera" + std::to_string(i), "/cam" + std::to_string(i) + "/image_raw");
+      _node->get_parameter("topic_camera" + std::to_string(i), cam_topic);
+      parser->parse_external("relative_config_imucam", "cam" + std::to_string(i), "rostopic", cam_topic);
+
+      auto sub = _node->create_subscription<sensor_msgs::msg::Image>(
+          cam_topic, 10, [this, i](const sensor_msgs::msg::Image::SharedPtr msg0) { callback_monocular(msg0, i); });
+      subs_cam.push_back(sub);
+      PRINT_INFO("  -> Async Cam (ID: %d): %s\n", i, cam_topic.c_str());
+    }
+  }
+  else{
   // Logic for sync stereo subscriber
   // https://answers.ros.org/question/96346/subscribe-to-two-image_raws-with-one-function/?answer=96491#post-id-96491
   if (_app->get_params().state_options.num_cameras == 2) {
@@ -215,6 +261,7 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
       subs_cam.push_back(sub);
       PRINT_INFO("subscribing to cam (mono): %s\n", cam_topic.c_str());
     }
+  }
   }
 }
 
@@ -573,6 +620,71 @@ void ROS2Visualizer::callback_stereo(const sensor_msgs::msg::Image::ConstSharedP
 
   // Load the mask if we are using it, else it is empty
   // TODO: in the future we should get this from external pixel segmentation
+  if (_app->get_params().use_mask) {
+    message.masks.push_back(_app->get_params().masks.at(cam_id0));
+    message.masks.push_back(_app->get_params().masks.at(cam_id1));
+  } else {
+    // message.masks.push_back(cv::Mat(cv_ptr0->image.rows, cv_ptr0->image.cols, CV_8UC1, cv::Scalar(255)));
+    message.masks.push_back(cv::Mat::zeros(cv_ptr0->image.rows, cv_ptr0->image.cols, CV_8UC1));
+    message.masks.push_back(cv::Mat::zeros(cv_ptr1->image.rows, cv_ptr1->image.cols, CV_8UC1));
+  }
+
+  // append it to our queue of images
+  std::lock_guard<std::mutex> lck(camera_queue_mtx);
+  camera_queue.push_back(message);
+  std::sort(camera_queue.begin(), camera_queue.end());
+}
+
+void ROS2Visualizer::callback_stereo_depth(const sensor_msgs::msg::Image::ConstSharedPtr msg0, 
+                                           const sensor_msgs::msg::Image::ConstSharedPtr msg1,
+                                           const sensor_msgs::msg::Image::ConstSharedPtr msg_depth,
+                                           int cam_id0, int cam_id1) {
+  // Check if we should drop this image
+  double timestamp = msg0->header.stamp.sec + msg0->header.stamp.nanosec * 1e-9;
+  double time_delta = 1.0 / _app->get_params().track_frequency;
+  if (camera_last_timestamp.find(cam_id0) != camera_last_timestamp.end() && timestamp < camera_last_timestamp.at(cam_id0) + time_delta) {
+    return;
+  }
+  camera_last_timestamp[cam_id0] = timestamp;
+
+  // Get the image
+  cv_bridge::CvImageConstPtr cv_ptr0;
+  try {
+    cv_ptr0 = cv_bridge::toCvShare(msg0, sensor_msgs::image_encodings::MONO8);
+  } catch (cv_bridge::Exception &e) {
+    PRINT_ERROR("cv_bridge exception: %s", e.what());
+    return;
+  }
+
+  cv_bridge::CvImageConstPtr cv_ptr1;
+  try {
+    cv_ptr1 = cv_bridge::toCvShare(msg1, sensor_msgs::image_encodings::MONO8);
+  } catch (cv_bridge::Exception &e) {
+    PRINT_ERROR("cv_bridge exception: %s", e.what());
+    return;
+  }
+
+  // Depth image
+  cv_bridge::CvImageConstPtr cv_ptr_depth;
+  try {
+    cv_ptr_depth = cv_bridge::toCvShare(msg_depth, sensor_msgs::image_encodings::TYPE_32FC1);
+  } catch (cv_bridge::Exception &e) {
+    PRINT_ERROR("cv_bridge exception: %s", e.what());
+    return;
+  }
+
+  // Create the measurement
+  ov_core::CameraData message;
+  message.timestamp = cv_ptr0->header.stamp.sec + cv_ptr0->header.stamp.nanosec * 1e-9;
+  message.sensor_ids.push_back(cam_id0);
+  message.sensor_ids.push_back(cam_id1);
+  message.images.push_back(cv_ptr0->image.clone());
+  message.images.push_back(cv_ptr1->image.clone());
+
+  // Depth image
+  message.depths.push_back(cv_ptr_depth->image.clone());
+
+  // Load the mask if we are using it, else it is empty
   if (_app->get_params().use_mask) {
     message.masks.push_back(_app->get_params().masks.at(cam_id0));
     message.masks.push_back(_app->get_params().masks.at(cam_id1));

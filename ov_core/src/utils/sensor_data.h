@@ -63,6 +63,9 @@ struct CameraData {
   /// Raw image we have collected for each camera
   std::vector<cv::Mat> images;
 
+  /// Optional depth image for each camera (aligned with images, meters)
+  std::vector<cv::Mat> depths;
+
   /// Tracking masks for each camera we have
   std::vector<cv::Mat> masks;
 

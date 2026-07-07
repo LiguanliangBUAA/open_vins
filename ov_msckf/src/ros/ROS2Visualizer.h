@@ -119,6 +119,12 @@ public:
   void callback_stereo(const sensor_msgs::msg::Image::ConstSharedPtr msg0, const sensor_msgs::msg::Image::ConstSharedPtr msg1, int cam_id0,
                        int cam_id1);
 
+  /// Callback for synchronized stereo camera information with depth
+  void callback_stereo_depth(const sensor_msgs::msg::Image::ConstSharedPtr msg0,
+                             const sensor_msgs::msg::Image::ConstSharedPtr msg1, 
+                             const sensor_msgs::msg::Image::ConstSharedPtr msg_depth, 
+                             int cam_id0, int cam_id1);
+
 protected:
   /// Publish the current state
   void publish_state();
@@ -161,7 +167,15 @@ protected:
   typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::Image> sync_pol;
   std::vector<std::shared_ptr<message_filters::Synchronizer<sync_pol>>> sync_cam;
   std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>> sync_subs_cam;
+  // For stereo depth camera
+  typedef message_filters::sync_policies::ApproximateTime<
+    sensor_msgs::msg::Image,
+    sensor_msgs::msg::Image,
+    sensor_msgs::msg::Image> sync_pol_depth;
 
+  std::shared_ptr<message_filters::Synchronizer<sync_pol_depth>> sync_stereo_depth;
+  std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> sub_stereo_depth;
+  
   // For path viz
   std::vector<geometry_msgs::msg::PoseStamped> poses_imu;
 
