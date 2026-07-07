@@ -203,6 +203,8 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
     sync_subs_cam.push_back(image_sub0);
     sync_subs_cam.push_back(image_sub1);
 
+    expected_unique_stream = 1 + (_app->get_params().state_options.num_cameras - 2); // stereo = 1 + async cams
+
     PRINT_INFO("  -> Syncing D435i Front: %s, %s, %s\n", cam_topic0.c_str(), cam_topic1.c_str(), depth_topic.c_str());
 
     // Other camera Asynchronous processing
@@ -512,7 +514,8 @@ void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr ms
     // If we do not have enough unique cameras then we need to wait
     // We should wait till we have one of each camera to ensure we propagate in the correct order
     auto params = _app->get_params();
-    size_t num_unique_cameras = (params.state_options.num_cameras == 2) ? 1 : params.state_options.num_cameras;
+    // size_t num_unique_cameras = (params.state_options.num_cameras == 2) ? 1 : params.state_options.num_cameras;
+    size_t num_unique_cameras = (expected_unique_stream > 0) ? expected_unique_stream : ((params.state_options.num_cameras == 2) ? 1 : params.state_options.num_cameras);
     if (unique_cam_ids.size() == num_unique_cameras) {
 
       // Loop through our queue and see if we are able to process any of our camera measurements

@@ -220,6 +220,10 @@ protected:
   // Files and if we should save total state
   bool save_total_state = false;
   std::ofstream of_state_est, of_state_std, of_state_gt;
+
+  // Our configuration parser
+  // stream num
+  size_t expected_unique_stream = 0;
 };
 
 } // namespace ov_msckf
