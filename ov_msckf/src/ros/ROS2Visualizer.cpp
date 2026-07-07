@@ -187,8 +187,8 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
     _node->declare_parameter<std::string>("topic_camera1", "/cam1/image_raw");
     _node->get_parameter("topic_camera1", cam_topic1);
     // Depth topic
-    _node->declare_parameter<std::string>("topic_depth", "/depth/image_raw");
-    _node->get_parameter("topic_depth", depth_topic);
+    std::string depth_topic = "/depth/image_raw";
+    parser->parse_config("topic_depth", depth_topic, false);
 
     parser->parse_external("relative_config_imucam", "cam0", "rostopic", cam_topic0);
     parser->parse_external("relative_config_imucam", "cam1", "rostopic", cam_topic1);
