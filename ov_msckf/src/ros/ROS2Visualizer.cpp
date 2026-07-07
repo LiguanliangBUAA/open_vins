@@ -187,7 +187,7 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
     _node->declare_parameter<std::string>("topic_camera1", "/cam1/image_raw");
     _node->get_parameter("topic_camera1", cam_topic1);
     // Depth topic
-    std::string depth_topic = "/depth/image_raw";
+    depth_topic = "/depth/image_raw";
     parser->parse_config("topic_depth", depth_topic, false);
 
     parser->parse_external("relative_config_imucam", "cam0", "rostopic", cam_topic0);
@@ -664,9 +664,19 @@ void ROS2Visualizer::callback_stereo_depth(const sensor_msgs::msg::Image::ConstS
   }
 
   // Depth image
-  cv_bridge::CvImageConstPtr cv_ptr_depth;
+  cv::Mat depth_m;
   try {
-    cv_ptr_depth = cv_bridge::toCvShare(msg_depth, sensor_msgs::image_encodings::TYPE_32FC1);
+    if (msg_depth->encoding == sensor_msgs::image_encodings::TYPE_16UC1 ||
+        msg_depth->encoding == sensor_msgs::image_encodings::MONO16) {
+      // Real D435i: uint16 in millimeters -> convert to float meters
+      cv_bridge::toCvShare(msg_depth)->image.convertTo(depth_m, CV_32FC1, 0.001);
+    } else if (msg_depth->encoding == sensor_msgs::image_encodings::TYPE_32FC1) {
+      // Gazebo sim: already float meters
+      depth_m = cv_bridge::toCvShare(msg_depth)->image.clone();
+    } else {
+      PRINT_ERROR(RED "Unsupported depth encoding: %s\n" RESET, msg_depth->encoding.c_str());
+      return;
+    }
   } catch (cv_bridge::Exception &e) {
     PRINT_ERROR("cv_bridge exception: %s", e.what());
     return;
@@ -681,7 +691,7 @@ void ROS2Visualizer::callback_stereo_depth(const sensor_msgs::msg::Image::ConstS
   message.images.push_back(cv_ptr1->image.clone());
 
   // Depth image
-  message.depths.push_back(cv_ptr_depth->image.clone());
+  message.depths.push_back(depth_m);
 
   // Load the mask if we are using it, else it is empty
   if (_app->get_params().use_mask) {
