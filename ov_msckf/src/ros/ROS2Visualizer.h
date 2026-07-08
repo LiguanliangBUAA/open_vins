@@ -175,6 +175,10 @@ protected:
 
   std::shared_ptr<message_filters::Synchronizer<sync_pol_depth>> sync_stereo_depth;
   std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> sub_stereo_depth;
+
+  // Live groundtruth subscribers (from simulator topic)
+  rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_gt;
+  std::mutex gt_mtx;
   
   // For path viz
   std::vector<geometry_msgs::msg::PoseStamped> poses_imu;

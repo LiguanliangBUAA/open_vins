@@ -67,6 +67,9 @@ public:
    */
   void update(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec);
 
+  // Get initializer parameters
+  std::shared_ptr<ov_core::FeatureInitializer> get_initializer() const { return initializer; }
+
 protected:
   /// Options used during update
   UpdaterOptions _options;

@@ -136,6 +136,9 @@ public:
     feat_tracks_uvd = active_tracks_uvd;
   }
 
+  /// Returns the parameters of initializer
+  std::string get_init_stats();
+
 protected:
   /**
    * @brief Given a new set of camera images, this will track them.

@@ -174,7 +174,26 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
                                                               std::bind(&ROS2Visualizer::callback_inertial, this, std::placeholders::_1));
   PRINT_INFO("subscribing to IMU: %s\n", topic_imu.c_str());
 
-  // IMAV setup
+  // Load groundtruth from a live topic (Gazebo simulation)
+  std::string topic_gt = "/drone0/ground_truth/pose";
+  sub_gt = _node->create_subscription<geometry_msgs::msg::PoseStamped>(
+      topic_gt, rclcpp::SensorDataQoS(),
+      [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+        Eigen::Matrix<double, 17, 1> gt = Eigen::Matrix<double, 17, 1>::Zero();
+        gt(0) = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+        gt(1) = msg->pose.orientation.x;
+        gt(2) = msg->pose.orientation.y;
+        gt(3) = msg->pose.orientation.z;
+        gt(4) = msg->pose.orientation.w;
+        gt(5) = msg->pose.position.x;
+        gt(6) = msg->pose.position.y;
+        gt(7) = msg->pose.position.z;
+        std::lock_guard<std::mutex> lck(gt_mtx);
+        gt_states[gt(0)] = gt;
+      });
+  PRINT_INFO("subscribing to groundtruth: %s\n", topic_gt.c_str());
+
+  // IMAV subscribe setup
   bool use_imav_setup = false;
   parser->parse_config("use_imav_setup", use_imav_setup, false);
 
@@ -481,6 +500,10 @@ void ROS2Visualizer::visualize_final() {
   // Print the total time
   rT2 = boost::posix_time::microsec_clock::local_time();
   PRINT_INFO(REDPURPLE "TIME: %.3f seconds\n\n" RESET, (rT2 - rT1).total_microseconds() * 1e-6);
+
+  PRINT_INFO(REDPURPLE "====================================\n" RESET);
+  PRINT_INFO(REDPURPLE "%s\n" RESET, _app->get_init_stats().c_str());
+  PRINT_INFO(REDPURPLE "====================================\n\n" RESET);
 }
 
 void ROS2Visualizer::callback_inertial(const sensor_msgs::msg::Imu::SharedPtr msg) {
@@ -840,6 +863,13 @@ void ROS2Visualizer::publish_groundtruth() {
   // Check that we have the timestamp in our GT file [time(sec),q_GtoI,p_IinG,v_IinG,b_gyro,b_accel]
   if (_sim == nullptr && (gt_states.empty() || !DatasetReader::get_gt_state(timestamp_inI, state_gt, gt_states))) {
     return;
+  }
+
+  if (_sim == nullptr) {
+    std::lock_guard<std::mutex> lck(gt_mtx);
+    if (gt_states.empty() || !DatasetReader::get_gt_state(timestamp_inI, state_gt, gt_states)) {
+      return;
+    }
   }
 
   // Get the simulated groundtruth

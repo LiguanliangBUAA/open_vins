@@ -51,8 +51,6 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   const Eigen::Matrix<double, 3, 1> &p_AinG = anchorclone.pos();
 
   // Depth-Prior Initialization
-  static std::atomic<int> stat_depth_init_cnt{0};
-  static std::atomic<int> stat_tri_init_cnt{0};
   if (_options.use_depth_init && feat->depths.find(feat->anchor_cam_id) != feat->depths.end()) {
     const auto &zs = feat->depths.at(feat->anchor_cam_id);
     assert(zs.size() == feat->timestamps.at(feat->anchor_cam_id).size());
@@ -62,15 +60,15 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
       Eigen::Vector2f uvn = feat->uvs_norm.at(feat->anchor_cam_id).at(m);
       feat->p_FinA << uvn(0) * zs.at(m), uvn(1) * zs.at(m), zs.at(m);
       feat->p_FinG = R_GtoA.transpose() * feat->p_FinA + p_AinG;
-      stat_depth_init_cnt++;
+      stat_depth_init++;
       // if ((stat_depth_init_cnt + stat_tri_init_cnt) % 50 == 0)
-        PRINT_INFO(CYAN "[INIT STATS] depth %d | tri %d (%.1f%% depth)\n" RESET,
-                   stat_depth_init_cnt.load(), stat_tri_init_cnt.load(),
-                   100.0 * stat_depth_init_cnt / (stat_depth_init_cnt + stat_tri_init_cnt));
+      //  PRINT_INFO(CYAN "[INIT STATS] depth %d | tri %d (%.1f%% depth)\n" RESET,
+      //             stat_depth_init.load(), stat_tri_init.load(),
+      //             100.0 * stat_depth_init / (stat_depth_init + stat_tri_init));
       return true;
     }
   }
-  stat_tri_init_cnt++;
+  stat_tri_init++;
 
   // Our linear system matrices
   Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
@@ -405,14 +403,17 @@ bool FeatureInitializer::single_gaussnewton(std::shared_ptr<Feature> feat,
 
   if (feat->p_FinA(2) < _options.min_dist || feat->p_FinA(2) > _options.max_dist ||
       std::isnan(feat->p_FinA.norm())) {
+    stat_gn_fail++;
     return false;
   }
   if (!has_physical_depth && (feat->p_FinA.norm() / base_line_max) > _options.max_baseline) {
+    stat_gn_fail++;
     return false;
   }
 
   // Finally get position in global frame
   feat->p_FinG = R_GtoA.transpose() * feat->p_FinA + p_AinG;
+  stat_gn_ok++;
   return true;
 }
 
