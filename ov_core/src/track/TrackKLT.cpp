@@ -367,10 +367,12 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
   
   // Focal length of left camera
   bool has_valid_depth = (!message.depths.empty() && !message.depths[0].empty());
-  float fx = 1.0f; 
-  if (has_valid_depth) {
-    fx = camera_calib.at(cam_id_left)->get_K()(0, 0);
-  }
+  // fx is set to a sentinel value (-1.0f) when no depth is available
+  float fx = has_valid_depth ? camera_calib.at(cam_id_left)->get_K()(0, 0) : -1.0f;
+
+  // Validation parameters
+  int depth_valid_cnt = 0;
+  int depth_total_cnt = 0;
 
   // Update our feature database, with theses new observations
   for (size_t i = 0; i < good_left.size(); i++) {
@@ -380,7 +382,8 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
     float depth_var = -1.0f;
 
     // If available depth
-    if (!message.depths.empty() && !message.depths[0].empty()) {
+    if (has_valid_depth) {
+      depth_total_cnt++;
       cv::Mat depth_img = message.depths[0];
       int u_i = std::round(good_left.at(i).pt.x);
       int v_i = std::round(good_left.at(i).pt.y);
@@ -413,6 +416,14 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
 
             float sigma_z = (depth_val * depth_val) / (fx * stereo_baseline_) * sigma_d_;
             depth_var = sigma_z * sigma_z;
+
+            depth_valid_cnt++;
+            // Tempt Check
+            float cx = 0.5f * img_left.cols, cy = 0.5f * img_left.rows;
+            if (std::abs(good_left.at(i).pt.x - cx) < 30 && std::abs(good_left.at(i).pt.y - cy) < 30) {
+              PRINT_INFO(CYAN "[DEPTH-SAMPLE] uv=(%.0f,%.0f) z=%.2fm sigma_z=%.3fm\n" RESET,
+                         good_left.at(i).pt.x, good_left.at(i).pt.y, depth_val, sigma_z);
+            }
           }
         }
       }
@@ -422,6 +433,11 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
     database->update_feature(good_ids_left.at(i), message.timestamp, cam_id_left, 
                              good_left.at(i).pt.x, good_left.at(i).pt.y, 
                              npt_l.x, npt_l.y, depth_val, depth_var);
+  }
+
+  if (depth_total_cnt > 0) {
+    PRINT_INFO(CYAN "[DEPTH-STAT] valid %d / %d (%.1f%%)\n" RESET,
+               depth_valid_cnt, depth_total_cnt, 100.0 * depth_valid_cnt / depth_total_cnt);
   }
 
   for (size_t i = 0; i < good_right.size(); i++) {
