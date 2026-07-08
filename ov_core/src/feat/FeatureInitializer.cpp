@@ -54,8 +54,7 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   static std::atomic<int> stat_tri_init_cnt{0};
   if (feat->depths.find(feat->anchor_cam_id) != feat->depths.end()) {
     const auto &zs = feat->depths.at(feat->anchor_cam_id);
-    const auto &ts = feat->timestamps.at(feat->anchor_cam_id);
-    assert(zs.size() == ts.size());
+    assert(zs.size() == feat->timestamps.at(feat->anchor_cam_id).size());
     // Find the depth measurement that is closest to the anchor clone timestamp
     size_t m = zs.size() - 1;
     if (zs.at(m) > 0.0f) {
@@ -75,11 +74,6 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   // Our linear system matrices
   Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
   Eigen::Vector3d b = Eigen::Vector3d::Zero();
-
-  // Get the position of the anchor pose
-  ClonePose anchorclone = clonesCAM.at(feat->anchor_cam_id).at(feat->anchor_clone_timestamp);
-  const Eigen::Matrix<double, 3, 3> &R_GtoA = anchorclone.Rot();
-  const Eigen::Matrix<double, 3, 1> &p_AinG = anchorclone.pos();
 
   // Loop through each camera for this feature
   for (auto const &pair : feat->timestamps) {
@@ -391,8 +385,28 @@ bool FeatureInitializer::single_gaussnewton(std::shared_ptr<Feature> feat,
   // 1. If the feature is too close
   // 2. If the feature is invalid
   // 3. If the baseline ratio is large
+  // if (feat->p_FinA(2) < _options.min_dist || feat->p_FinA(2) > _options.max_dist ||
+  //     (feat->p_FinA.norm() / base_line_max) > _options.max_baseline || std::isnan(feat->p_FinA.norm())) {
+  //   return false;
+  // }
+
+  // // Finally get position in global frame
+  // feat->p_FinG = R_GtoA.transpose() * feat->p_FinA + p_AinG;
+  // return true;
+
+  // Features with a valid physical depth prior do not need parallax baseline
+  bool has_physical_depth = false;
+  if (feat->depths.find(feat->anchor_cam_id) != feat->depths.end() &&
+      !feat->depths.at(feat->anchor_cam_id).empty() &&
+      feat->depths.at(feat->anchor_cam_id).back() > 0.0f) {
+    has_physical_depth = true;
+  }
+
   if (feat->p_FinA(2) < _options.min_dist || feat->p_FinA(2) > _options.max_dist ||
-      (feat->p_FinA.norm() / base_line_max) > _options.max_baseline || std::isnan(feat->p_FinA.norm())) {
+      std::isnan(feat->p_FinA.norm())) {
+    return false;
+  }
+  if (!has_physical_depth && (feat->p_FinA.norm() / base_line_max) > _options.max_baseline) {
     return false;
   }
 
