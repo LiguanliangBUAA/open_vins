@@ -332,7 +332,7 @@ void ROS2Visualizer::visualize() {
     last_stat_print_time = _app->get_state()->_timestamp;
 
     PRINT_INFO(REDPURPLE "========== REAL-TIME STATS ==========\n" RESET);
-    PRINT_INFO(REDPURPLE "%s\n" RESET, ov_core::get_init_stats().c_str());
+    PRINT_INFO(REDPURPLE "%s\n" RESET, _app->get_init_stats().c_str());
     PRINT_INFO(REDPURPLE "=====================================\n\n" RESET);
   }
   // Print how much time it took to publish / displaying things
