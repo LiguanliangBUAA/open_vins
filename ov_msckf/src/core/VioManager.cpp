@@ -738,7 +738,7 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
 }
 
 std::string VioManager::get_init_stats() {
-  auto init = updateMSCKF->get_initializer();
+  auto init = updaterMSCKF->get_initializer();
   if (!init) return "[INIT STATs] Not Available.";
 
   int d_init = init->stat_depth_init.load();
@@ -746,13 +746,14 @@ std::string VioManager::get_init_stats() {
   int gn_ok = init->stat_gn_ok.load();
   int gn_fail = init->stat_gn_fail.load();
 
-  double depth_ration = 100 * d_init / std::max(1, d+init + t_init);
+  double depth_ratio = 100 * d_init / std::max(1, d_init + t_init);
   double fail_ratio = 100 * gn_fail / std::max(1, gn_ok + gn_fail);
 
   char buffer[512];
   snprintf(buffer, sizeof(buffer),
            "[INIT] depth %d | tri %d (%.1f%% depth)\n"
            "[GN]   ok %d | fail %d (%.1f%% fail)",
-           d_init, t_init, depth_ration,
+           d_init, t_init, depth_ratio,
            gn_ok, gn_fail, fail_ratio);
+  return std::string(buffer);
 }
