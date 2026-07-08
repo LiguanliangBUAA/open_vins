@@ -84,11 +84,13 @@ public:
    * @param v raw v coordinate
    * @param u_n undistorted/normalized u coordinate
    * @param v_n undistorted/normalized v coordinate
+   * @param depth depth of this feature (if available)
+   * @param depth_var variance of this feature (if available)
    *
    * This will update a given feature based on the passed ID it has.
    * It will create a new feature, if it is an ID that we have not seen before.
    */
-  void update_feature(size_t id, double timestamp, size_t cam_id, float u, float v, float u_n, float v_n);
+  void update_feature(size_t id, double timestamp, size_t cam_id, float u, float v, float u_n, float v_n, float depth = -1.0f, float depth_var = -1.0f);
 
   /**
    * @brief Get features that do not have newer measurement then the specified time.

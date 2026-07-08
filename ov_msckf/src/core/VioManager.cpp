@@ -139,6 +139,15 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
         params.fast_threshold, params.grid_x, params.grid_y, params.min_px_dist, params.knn_ratio));
   }
 
+  auto trk_klt = std::dynamic_pointer_cast<TrackKLT>(trackFEATS);
+  if (trk_klt) {
+    trk_klt->set_stereo_baseline(params.stereo_baseline);
+    trk_klt->set_sigma_d(params.sigma_d);
+    trk_klt->set_depth_range(params.depth_z_min, params.depth_z_max);
+  } else {
+    PRINT_WARNING(YELLOW "depth prior requested but tracker is not TrackKLT, ignoring\n" RESET);
+  }
+
   // Initialize our aruco tag extractor
   if (params.use_aruco) {
     trackARUCO = std::shared_ptr<TrackBase>(new TrackAruco(state->_cam_intrinsics_cameras, state->_options.max_aruco_features,
@@ -277,6 +286,16 @@ void VioManager::track_image_and_update(const ov_core::CameraData &message_const
     message.images.at(i) = img_temp;
     cv::pyrDown(mask, mask_temp, cv::Size(mask.cols / 2.0, mask.rows / 2.0));
     message.masks.at(i) = mask_temp;
+  }
+  // Downsample the depth images
+  if (params.downsample_cameras && !message.depths.empty()) {
+    for (size_t i = 0; i < message.depths.size(); i++) {
+      cv::Mat depth_temp;
+      cv::resize(message.depths[i], depth_temp,
+                 cv::Size(message.depths[i].cols / 2.0, message.depths[i].rows / 2.0), 
+                 0, 0, cv::INTER_NEAREST);
+      message.depths[i] = depth_temp;
+    }
   }
 
   // Perform our feature tracking!

@@ -31,11 +31,16 @@ void Feature::clean_old_measurements(const std::vector<double> &valid_times) {
     // Assert that we have all the parts of a measurement
     assert(timestamps[pair.first].size() == uvs[pair.first].size());
     assert(timestamps[pair.first].size() == uvs_norm[pair.first].size());
+    assert(timestamps[pair.first].size() == depths[pair.first].size());
+    assert(timestamps[pair.first].size() == depth_vars[pair.first].size());
 
     // Our iterators
     auto it1 = timestamps[pair.first].begin();
     auto it2 = uvs[pair.first].begin();
     auto it3 = uvs_norm[pair.first].begin();
+    // Depthiterators
+    auto it4 = depths[pair.first].begin();
+    auto it5 = depth_vars[pair.first].begin();
 
     // Loop through measurement times, remove ones that are not in our timestamps
     while (it1 != timestamps[pair.first].end()) {
@@ -43,10 +48,14 @@ void Feature::clean_old_measurements(const std::vector<double> &valid_times) {
         it1 = timestamps[pair.first].erase(it1);
         it2 = uvs[pair.first].erase(it2);
         it3 = uvs_norm[pair.first].erase(it3);
+        it4 = depths[pair.first].erase(it4);
+        it5 = depth_vars[pair.first].erase(it5);
       } else {
         ++it1;
         ++it2;
         ++it3;
+        ++it4;
+        ++it5;
       }
     }
   }
@@ -60,11 +69,16 @@ void Feature::clean_invalid_measurements(const std::vector<double> &invalid_time
     // Assert that we have all the parts of a measurement
     assert(timestamps[pair.first].size() == uvs[pair.first].size());
     assert(timestamps[pair.first].size() == uvs_norm[pair.first].size());
+    assert(timestamps[pair.first].size() == depths[pair.first].size());
+    assert(timestamps[pair.first].size() == depth_vars[pair.first].size());
 
     // Our iterators
     auto it1 = timestamps[pair.first].begin();
     auto it2 = uvs[pair.first].begin();
     auto it3 = uvs_norm[pair.first].begin();
+    // Depthiterators
+    auto it4 = depths[pair.first].begin();
+    auto it5 = depth_vars[pair.first].begin();
 
     // Loop through measurement times, remove ones that are in our timestamps
     while (it1 != timestamps[pair.first].end()) {
@@ -72,10 +86,14 @@ void Feature::clean_invalid_measurements(const std::vector<double> &invalid_time
         it1 = timestamps[pair.first].erase(it1);
         it2 = uvs[pair.first].erase(it2);
         it3 = uvs_norm[pair.first].erase(it3);
+        it4 = depths[pair.first].erase(it4);
+        it5 = depth_vars[pair.first].erase(it5);
       } else {
         ++it1;
         ++it2;
         ++it3;
+        ++it4;
+        ++it5;
       }
     }
   }
@@ -89,11 +107,16 @@ void Feature::clean_older_measurements(double timestamp) {
     // Assert that we have all the parts of a measurement
     assert(timestamps[pair.first].size() == uvs[pair.first].size());
     assert(timestamps[pair.first].size() == uvs_norm[pair.first].size());
+    assert(timestamps[pair.first].size() == depths[pair.first].size());
+    assert(timestamps[pair.first].size() == depth_vars[pair.first].size());
 
     // Our iterators
     auto it1 = timestamps[pair.first].begin();
     auto it2 = uvs[pair.first].begin();
     auto it3 = uvs_norm[pair.first].begin();
+    // Depthiterators
+    auto it4 = depths[pair.first].begin();
+    auto it5 = depth_vars[pair.first].begin();
 
     // Loop through measurement times, remove ones that are older then the specified one
     while (it1 != timestamps[pair.first].end()) {
@@ -101,10 +124,14 @@ void Feature::clean_older_measurements(double timestamp) {
         it1 = timestamps[pair.first].erase(it1);
         it2 = uvs[pair.first].erase(it2);
         it3 = uvs_norm[pair.first].erase(it3);
+        it4 = depths[pair.first].erase(it4);
+        it5 = depth_vars[pair.first].erase(it5);
       } else {
         ++it1;
         ++it2;
         ++it3;
+        ++it4;
+        ++it5;
       }
     }
   }

@@ -62,6 +62,24 @@ public:
    */
   void feed_new_camera(const CameraData &message) override;
 
+  /**
+   * @brief Set the stereo baseline for the KLT tracker
+   * @param baseline stereo baseline in meters
+   */
+  void set_stereo_baseline(double baseline) { this->stereo_baseline_ = baseline; }
+
+  /**
+   * @brief Set the sigma_d parameter for the KLT tracker
+   * @param sigma_d sigma_d parameter in meters
+   */
+  void set_sigma_d(double sigma_d) { this->sigma_d_ = sigma_d; }
+
+  /**
+   * @brief Set the range of depth values for the KLT tracker
+   * @param depth_range range of depth values in meters
+   */
+  void set_depth_range(double depth_z_min, double depth_z_max) { this->depth_z_min_ = depth_z_min; this->depth_z_max_ = depth_z_max; }
+
 protected:
   /**
    * @brief Process a new monocular image
@@ -147,6 +165,12 @@ protected:
   std::map<size_t, std::vector<cv::Mat>> img_pyramid_last;
   std::map<size_t, cv::Mat> img_curr;
   std::map<size_t, std::vector<cv::Mat>> img_pyramid_curr;
+
+  // Parameters for Depth Noise Estimation
+  double stereo_baseline_ = 0.05;
+  double sigma_d_ = 0.1;
+  double depth_z_min_ = 0.15;
+  double depth_z_max_ = 8.0;
 };
 
 } // namespace ov_core

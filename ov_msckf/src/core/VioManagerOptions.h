@@ -444,6 +444,12 @@ struct VioManagerOptions {
   /// Parameters used by our feature initialize / triangulator
   ov_core::FeatureInitializerOptions featinit_options;
 
+  /// IMAV depth prior parameters
+  double stereo_baseline = 0.05; // meters
+  double sigma_d = 0.1; // pixels, disparity noise
+  double depth_z_min = 0.15; // meters
+  double depth_z_max = 8.0; // meters
+
   /**
    * @brief This function will load print out all parameters related to visual tracking
    * This allows for visual checking that everything was loaded properly from ROS/CMD parsers.
@@ -465,6 +471,10 @@ struct VioManagerOptions {
       parser->parse_config("grid_x", grid_x);
       parser->parse_config("grid_y", grid_y);
       parser->parse_config("min_px_dist", min_px_dist);
+      parser->parse_config("stereo_baseline", stereo_baseline, false);
+      parser->parse_config("sigma_d", sigma_d, false);
+      parser->parse_config("depth_z_min", depth_z_min, false);
+      parser->parse_config("depth_z_max", depth_z_max, false);
       std::string histogram_method_str = "HISTOGRAM";
       parser->parse_config("histogram_method", histogram_method_str);
       if (histogram_method_str == "NONE") {
@@ -499,6 +509,9 @@ struct VioManagerOptions {
     PRINT_DEBUG("  - hist method: %d\n", (int)histogram_method);
     PRINT_DEBUG("  - knn ratio: %.3f\n", knn_ratio);
     PRINT_DEBUG("  - track frequency: %.1f\n", track_frequency);
+    PRINT_DEBUG("  - stereo_baseline: %.3f\n", stereo_baseline);
+    PRINT_DEBUG("  - sigma_d: %.3f\n", sigma_d);
+    PRINT_DEBUG("  - depth_z: [%.2f, %.2f]\n", depth_z_min, depth_z_max);
     featinit_options.print(parser);
   }
 

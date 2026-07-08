@@ -354,15 +354,81 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
   }
 
   // Update our feature database, with theses new observations
+  // for (size_t i = 0; i < good_left.size(); i++) {
+  //   cv::Point2f npt_l = camera_calib.at(cam_id_left)->undistort_cv(good_left.at(i).pt);
+  //   database->update_feature(good_ids_left.at(i), message.timestamp, cam_id_left, good_left.at(i).pt.x, good_left.at(i).pt.y, npt_l.x,
+  //                            npt_l.y);
+  // }
+  // for (size_t i = 0; i < good_right.size(); i++) {
+  //   cv::Point2f npt_r = camera_calib.at(cam_id_right)->undistort_cv(good_right.at(i).pt);
+  //   database->update_feature(good_ids_right.at(i), message.timestamp, cam_id_right, good_right.at(i).pt.x, good_right.at(i).pt.y, npt_r.x,
+  //                            npt_r.y);
+  // }
+  
+  // Focal length of left camera
+  bool has_valid_depth = (!message.depths.empty() && !message.depths[0].empty());
+  float fx = 1.0f; 
+  if (has_valid_depth) {
+    fx = camera_calib.at(cam_id_left)->get_K()(0, 0);
+  }
+
+  // Update our feature database, with theses new observations
   for (size_t i = 0; i < good_left.size(); i++) {
     cv::Point2f npt_l = camera_calib.at(cam_id_left)->undistort_cv(good_left.at(i).pt);
-    database->update_feature(good_ids_left.at(i), message.timestamp, cam_id_left, good_left.at(i).pt.x, good_left.at(i).pt.y, npt_l.x,
-                             npt_l.y);
+
+    float depth_val = -1.0f;
+    float depth_var = -1.0f;
+
+    // If available depth
+    if (!message.depths.empty() && !message.depths[0].empty()) {
+      cv::Mat depth_img = message.depths[0];
+      int u_i = std::round(good_left.at(i).pt.x);
+      int v_i = std::round(good_left.at(i).pt.y);
+
+      if (u_i > 1 && u_i < depth_img.cols - 1 && v_i > 1 && v_i < depth_img.rows - 1) {
+        std::vector<float> patch;
+        float sum = 0.0f, sq_sum = 0.0f;
+        int valid_cnt = 0;
+
+        for (int dy = -1; dy <= 1; ++dy) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            float d = depth_img.at<float>(v_i + dy, u_i + dx);
+            if (d > depth_z_min_ && d < depth_z_max_) {
+              patch.push_back(d);
+              sum += d;
+              sq_sum += d * d;
+              valid_cnt++;
+            }
+          }
+        }
+
+        if (valid_cnt >= 5) {
+          float mean = sum / valid_cnt;
+          float var = (sq_sum / valid_cnt) - (mean * mean);
+          float std_rel = std::sqrt(std::max(var, 0.0f)) / mean;
+
+          if (std_rel < 0.05f) { 
+            std::sort(patch.begin(), patch.end());
+            depth_val = patch[patch.size() / 2];
+
+            float sigma_z = (depth_val * depth_val) / (fx * stereo_baseline_) * sigma_d_;
+            depth_var = sigma_z * sigma_z;
+          }
+        }
+      }
+    }
+
+    // Update Database 
+    database->update_feature(good_ids_left.at(i), message.timestamp, cam_id_left, 
+                             good_left.at(i).pt.x, good_left.at(i).pt.y, 
+                             npt_l.x, npt_l.y, depth_val, depth_var);
   }
+
   for (size_t i = 0; i < good_right.size(); i++) {
     cv::Point2f npt_r = camera_calib.at(cam_id_right)->undistort_cv(good_right.at(i).pt);
-    database->update_feature(good_ids_right.at(i), message.timestamp, cam_id_right, good_right.at(i).pt.x, good_right.at(i).pt.y, npt_r.x,
-                             npt_r.y);
+    database->update_feature(good_ids_right.at(i), message.timestamp, cam_id_right, 
+                             good_right.at(i).pt.x, good_right.at(i).pt.y, 
+                             npt_r.x, npt_r.y, -1.0f, -1.0f);
   }
 
   // Move forward in time

@@ -54,6 +54,10 @@ public:
   /// Timestamps of each UV measurement (mapped by camera ID)
   std::unordered_map<size_t, std::vector<double>> timestamps;
 
+  /// Depth information and variance of this feature (mapped by camera ID)
+  std::unordered_map<size_t, std::vector<float>> depths;
+  std::unordered_map<size_t, std::vector<float>> depth_vars;
+
   /// What camera ID our pose is anchored in!! By default the first measurement is the anchor.
   int anchor_cam_id = -1;
 
