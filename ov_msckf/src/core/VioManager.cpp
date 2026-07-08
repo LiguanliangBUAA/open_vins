@@ -141,6 +141,7 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
 
   auto trk_klt = std::dynamic_pointer_cast<TrackKLT>(trackFEATS);
   if (trk_klt) {
+    trk_klt->set_use_depth_extraction(params.use_depth_extraction);
     trk_klt->set_stereo_baseline(params.stereo_baseline);
     trk_klt->set_sigma_d(params.sigma_d);
     trk_klt->set_depth_range(params.depth_z_min, params.depth_z_max);

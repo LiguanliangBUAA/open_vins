@@ -445,6 +445,7 @@ struct VioManagerOptions {
   ov_core::FeatureInitializerOptions featinit_options;
 
   /// IMAV depth prior parameters
+  bool use_depth_extraction = true;
   double stereo_baseline = 0.05; // meters
   double sigma_d = 0.1; // pixels, disparity noise
   double depth_z_min = 0.15; // meters
@@ -471,6 +472,9 @@ struct VioManagerOptions {
       parser->parse_config("grid_x", grid_x);
       parser->parse_config("grid_y", grid_y);
       parser->parse_config("min_px_dist", min_px_dist);
+      parser->parse_config("use_depth_extraction", use_depth_extraction);
+      parser->parse_config("use_depth_init", featinit_options.use_depth_init, true);
+      parser->parse_config("use_depth_anchor_tiebreak", featinit_options.use_depth_anchor_tiebreak, true);
       parser->parse_config("stereo_baseline", stereo_baseline, false);
       parser->parse_config("sigma_d", sigma_d, false);
       parser->parse_config("depth_z_min", depth_z_min, false);
@@ -509,6 +513,9 @@ struct VioManagerOptions {
     PRINT_DEBUG("  - hist method: %d\n", (int)histogram_method);
     PRINT_DEBUG("  - knn ratio: %.3f\n", knn_ratio);
     PRINT_DEBUG("  - track frequency: %.1f\n", track_frequency);
+    PRINT_DEBUG("  - use_depth_extraction: %d\n", use_depth_extraction);
+    PRINT_DEBUG("  - use_depth_init: %d\n", featinit_options.use_depth_init);
+    PRINT_DEBUG("  - use_depth_anchor_tiebreak: %d\n", featinit_options.use_depth_anchor_tiebreak);
     PRINT_DEBUG("  - stereo_baseline: %.3f\n", stereo_baseline);
     PRINT_DEBUG("  - sigma_d: %.3f\n", sigma_d);
     PRINT_DEBUG("  - depth_z: [%.2f, %.2f]\n", depth_z_min, depth_z_max);

@@ -63,6 +63,12 @@ public:
   void feed_new_camera(const CameraData &message) override;
 
   /**
+   * @brief Set the flag for whether use depth extraction
+   * @param use_depth whether to use depth extraction
+   */
+  void set_use_depth_extraction(bool use_depth) { this->use_depth_extraction_ = use_depth; }
+
+  /**
    * @brief Set the stereo baseline for the KLT tracker
    * @param baseline stereo baseline in meters
    */
@@ -167,6 +173,7 @@ protected:
   std::map<size_t, std::vector<cv::Mat>> img_pyramid_curr;
 
   // Parameters for Depth Noise Estimation
+  bool use_depth_extraction_ = true;
   double stereo_baseline_ = 0.05;
   double sigma_d_ = 0.1;
   double depth_z_min_ = 0.15;

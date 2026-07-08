@@ -37,8 +37,8 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   size_t most_meas = 0;
   for (auto const &pair : feat->timestamps) {
     total_meas += (int)pair.second.size();
-    if (pair.second.size() > most_meas ||
-        (pair.second.size() == most_meas && pair.first == 0)) {
+    bool tiebreak = _options.use_depth_anchor_tiebreak && (pair.second.size() == most_meas && pair.first == 0);
+    if (pair.second.size() > most_meas || tiebreak) {
       anchor_most_meas = pair.first;
       most_meas = pair.second.size();
     }
@@ -53,7 +53,7 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   // Depth-Prior Initialization
   static std::atomic<int> stat_depth_init_cnt{0};
   static std::atomic<int> stat_tri_init_cnt{0};
-  if (feat->depths.find(feat->anchor_cam_id) != feat->depths.end()) {
+  if (_options.use_depth_init && feat->depths.find(feat->anchor_cam_id) != feat->depths.end()) {
     const auto &zs = feat->depths.at(feat->anchor_cam_id);
     assert(zs.size() == feat->timestamps.at(feat->anchor_cam_id).size());
     // Find the depth measurement that is closest to the anchor clone timestamp

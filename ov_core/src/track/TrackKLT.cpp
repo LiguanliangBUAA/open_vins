@@ -368,7 +368,7 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
   // }
   
   // Focal length of left camera
-  bool has_valid_depth = (!message.depths.empty() && !message.depths[0].empty());
+  bool has_valid_depth = use_depth_extraction_ && (!message.depths.empty() && !message.depths[0].empty());
   // fx is set to a sentinel value (-1.0f) when no depth is available
   float fx = has_valid_depth ? camera_calib.at(cam_id_left)->get_K()(0, 0) : -1.0f;
 
