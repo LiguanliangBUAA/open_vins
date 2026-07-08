@@ -45,6 +45,33 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
   feat->anchor_cam_id = anchor_most_meas;
   feat->anchor_clone_timestamp = feat->timestamps.at(feat->anchor_cam_id).back();
 
+  ClonePose anchorclone = clonesCAM.at(feat->anchor_cam_id).at(feat->anchor_clone_timestamp);
+  const Eigen::Matrix<double, 3, 3> &R_GtoA = anchorclone.Rot();
+  const Eigen::Matrix<double, 3, 1> &p_AinG = anchorclone.pos();
+
+  // Depth-Prior Initialization
+  static std::atomic<int> stat_depth_init_cnt{0};
+  static std::atomic<int> stat_tri_init_cnt{0};
+  if (feat->depths.find(feat->anchor_cam_id) != feat->depths.end()) {
+    const auto &zs = feat->depths.at(feat->anchor_cam_id);
+    const auto &ts = feat->timestamps.at(feat->anchor_cam_id);
+    assert(zs.size() == ts.size());
+    // Find the depth measurement that is closest to the anchor clone timestamp
+    size_t m = zs.size() - 1;
+    if (zs.at(m) > 0.0f) {
+      Eigen::Vector2f uvn = feat->uvs_norm.at(feat->anchor_cam_id).at(m);
+      feat->p_FinA << uvn(0) * zs.at(m), uvn(1) * zs.at(m), zs.at(m);
+      feat->p_FinG = R_GtoA.transpose() * feat->p_FinA + p_AinG;
+      stat_depth_init_cnt++;
+      if ((stat_depth_init_cnt + stat_tri_init_cnt) % 500 == 0)
+        PRINT_INFO(CYAN "[INIT STATS] depth %d | tri %d (%.1f%% depth)\n" RESET,
+                   stat_depth_init_cnt.load(), stat_tri_init_cnt.load(),
+                   100.0 * stat_depth_init_cnt / (stat_depth_init_cnt + stat_tri_init_cnt));
+      return true;
+    }
+  }
+  stat_tri_init_cnt++;
+
   // Our linear system matrices
   Eigen::Matrix3d A = Eigen::Matrix3d::Zero();
   Eigen::Vector3d b = Eigen::Vector3d::Zero();

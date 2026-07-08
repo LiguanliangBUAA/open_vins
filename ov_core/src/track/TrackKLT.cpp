@@ -29,6 +29,8 @@
 #include "utils/opencv_lambda_body.h"
 #include "utils/print.h"
 
+# define DEPTH_VERIFT
+
 using namespace ov_core;
 
 void TrackKLT::feed_new_camera(const CameraData &message) {
@@ -419,11 +421,13 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
 
             depth_valid_cnt++;
             // Tempt Check
+            # ifdef DEPTH_VERIFT
             float cx = 0.5f * img_left.cols, cy = 0.5f * img_left.rows;
             if (std::abs(good_left.at(i).pt.x - cx) < 30 && std::abs(good_left.at(i).pt.y - cy) < 30) {
               PRINT_INFO(CYAN "[DEPTH-SAMPLE] uv=(%.0f,%.0f) z=%.2fm sigma_z=%.3fm\n" RESET,
                          good_left.at(i).pt.x, good_left.at(i).pt.y, depth_val, sigma_z);
             }
+            # endif
           }
         }
       }
@@ -434,12 +438,12 @@ void TrackKLT::feed_stereo(const CameraData &message, size_t msg_id_left, size_t
                              good_left.at(i).pt.x, good_left.at(i).pt.y, 
                              npt_l.x, npt_l.y, depth_val, depth_var);
   }
-
+  # ifdef DEPTH_VERIFT
   if (depth_total_cnt > 0) {
     PRINT_INFO(CYAN "[DEPTH-STAT] valid %d / %d (%.1f%%)\n" RESET,
                depth_valid_cnt, depth_total_cnt, 100.0 * depth_valid_cnt / depth_total_cnt);
   }
-
+  # endif
   for (size_t i = 0; i < good_right.size(); i++) {
     cv::Point2f npt_r = camera_calib.at(cam_id_right)->undistort_cv(good_right.at(i).pt);
     database->update_feature(good_ids_right.at(i), message.timestamp, cam_id_right, 
