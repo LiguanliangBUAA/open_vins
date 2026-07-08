@@ -62,7 +62,7 @@ bool FeatureInitializer::single_triangulation(std::shared_ptr<Feature> feat,
       feat->p_FinA << uvn(0) * zs.at(m), uvn(1) * zs.at(m), zs.at(m);
       feat->p_FinG = R_GtoA.transpose() * feat->p_FinA + p_AinG;
       stat_depth_init_cnt++;
-      if ((stat_depth_init_cnt + stat_tri_init_cnt) % 500 == 0)
+      if ((stat_depth_init_cnt + stat_tri_init_cnt) % 50 == 0)
         PRINT_INFO(CYAN "[INIT STATS] depth %d | tri %d (%.1f%% depth)\n" RESET,
                    stat_depth_init_cnt.load(), stat_tri_init_cnt.load(),
                    100.0 * stat_depth_init_cnt / (stat_depth_init_cnt + stat_tri_init_cnt));
