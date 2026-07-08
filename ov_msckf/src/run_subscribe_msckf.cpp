@@ -114,6 +114,9 @@ int main(int argc, char **argv) {
 
   // Final visualization
   viz->visualize_final();
+
+  fflush(stdout);
+  std::exit(EXIT_SUCCESS);
 #if ROS_AVAILABLE == 1
   ros::shutdown();
 #elif ROS_AVAILABLE == 2

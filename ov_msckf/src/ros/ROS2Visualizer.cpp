@@ -327,14 +327,6 @@ void ROS2Visualizer::visualize() {
     ROSVisualizerHelper::sim_save_total_state_to_file(_app->get_state(), _sim, of_state_est, of_state_std, of_state_gt);
   }
 
-  static double last_stat_print_time = 0;
-  if (_app->get_state()->_timestamp - last_stat_print_time > 5.0) {
-    last_stat_print_time = _app->get_state()->_timestamp;
-
-    PRINT_INFO(REDPURPLE "========== REAL-TIME STATS ==========\n" RESET);
-    PRINT_INFO(REDPURPLE "%s\n" RESET, _app->get_init_stats().c_str());
-    PRINT_INFO(REDPURPLE "=====================================\n\n" RESET);
-  }
   // Print how much time it took to publish / displaying things
   // rT0_2 = boost::posix_time::microsec_clock::local_time();
   // double time_total = (rT0_2 - rT0_1).total_microseconds() * 1e-6;
