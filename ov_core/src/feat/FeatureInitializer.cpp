@@ -413,6 +413,8 @@ bool FeatureInitializer::single_gaussnewton(std::shared_ptr<Feature> feat,
 
   if (std::isnan(feat->p_FinA.norm())) {
     stat_gn_fail_nan++;
+    if (has_physical_depth) stat_gn_fail_nan_depth++;
+    else stat_gn_fail_tri++;
     return false;
   }
   
