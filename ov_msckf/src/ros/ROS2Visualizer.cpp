@@ -872,23 +872,20 @@ void ROS2Visualizer::publish_groundtruth() {
   }
 
   // Get the current system state estimate
-  Eigen::Matrix<double, 16, 1> state_ekf = _app->get_state()->_imu->value();
-
-  Eigen::Matrix<double, 4, 1> q_est = state_ekf.block<4, 1>(0, 0); // JPL q_GtoI
+  Eigen::Matrix<double, 4, 1> q_est = state_ekf.block<4, 1>(0, 0); 
   Eigen::Vector3d p_est = state_ekf.block<3, 1>(4, 0);
 
   if (!gt_aligned) {
     Eigen::Matrix3d R_GtoI_est = ov_core::quat_2_Rot(q_est);
     Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0));
     
-    Eigen::Matrix3d R_gt2est = R_GtoI_est.transpose() * R_GtoI_gt;
-    double yaw = std::atan2(R_gt2est(1, 0), R_gt2est(0, 0));
-    R_align = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+    R_align = R_GtoI_est.transpose() * R_GtoI_gt; 
     t_align = p_est - R_align * state_gt.block<3, 1>(5, 0);
     gt_aligned = true;
     
-    PRINT_INFO(GREEN "[GT-ALIGN] yaw offset %.1f deg, t = (%.2f, %.2f, %.2f)\n" RESET,
-               yaw * 180.0 / M_PI, t_align(0), t_align(1), t_align(2));
+    PRINT_INFO(GREEN "\n=======================================================\n" RESET);
+    PRINT_INFO(GREEN "[GT-ALIGN] SUCCESS! Full 3D Alignment. t = (%.2f, %.2f, %.2f)\n" RESET, t_align(0), t_align(1), t_align(2));
+    PRINT_INFO(GREEN "=======================================================\n\n" RESET);
   }
 
   state_gt.block<3, 1>(5, 0) = R_align * state_gt.block<3, 1>(5, 0).eval() + t_align;
