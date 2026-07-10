@@ -856,63 +856,47 @@ void ROS2Visualizer::publish_groundtruth() {
   Eigen::Matrix<double, 17, 1> state_gt;
 
   // We want to publish in the IMU clock frame
-  // The timestamp in the state will be the last camera time
   double t_ItoC = _app->get_state()->_calib_dt_CAMtoIMU->value()(0);
   double timestamp_inI = _app->get_state()->_timestamp + t_ItoC;
 
-  // Check that we have the timestamp in our GT file [time(sec),q_GtoI,p_IinG,v_IinG,b_gyro,b_accel]
-  if (_sim == nullptr && (gt_states.empty() || !DatasetReader::get_gt_state(timestamp_inI, state_gt, gt_states))) {
-    return;
-  }
-
+  // Check that we have the timestamp in our GT file or topic
   if (_sim == nullptr) {
     std::lock_guard<std::mutex> lck(gt_mtx);
     if (gt_states.empty() || !DatasetReader::get_gt_state(timestamp_inI, state_gt, gt_states)) {
       return;
     }
-  }
-
-  // Get the simulated groundtruth
-  // NOTE: we get the true time in the IMU clock frame
-  if (_sim != nullptr) {
+  } else {
     timestamp_inI = _app->get_state()->_timestamp + _sim->get_true_parameters().calib_camimu_dt;
     if (!_sim->get_state(timestamp_inI, state_gt))
       return;
   }
 
-  // Get the GT and system state state
+  // Get the current system state estimate
   Eigen::Matrix<double, 16, 1> state_ekf = _app->get_state()->_imu->value();
 
+  Eigen::Matrix<double, 4, 1> q_est = state_ekf.block<4, 1>(0, 0); // JPL q_GtoI
+  Eigen::Vector3d p_est = state_ekf.block<3, 1>(4, 0);
+
   if (!gt_aligned) {
-    Eigen::Vector4d q_est_vec = state_ekf.block<4, 1>(0, 0);
-    Eigen::Matrix3d R_GtoI_est = ov_core::quat_2_Rot(q_est_vec);
-    Eigen::Matrix3d R_ItoG_est = R_GtoI_est.transpose();
-
-    Eigen::Vector4d q_gt_vec = state_gt.block<4, 1>(1, 0);
-    Eigen::Matrix3d R_GtoI_gt = ov_core::quat_2_Rot(q_gt_vec);
-    Eigen::Matrix3d R_ItoG_gt = R_GtoI_gt.transpose();
-
-    Eigen::Matrix3d R_err = R_ItoG_est * R_ItoG_gt.transpose();
-    align_yaw = std::atan2(R_err(1, 0), R_err(0, 0));
-
-    Eigen::Matrix3d R_align = Eigen::AngleAxisd(align_yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-    align_t = state_ekf.block<3, 1>(4, 0) - R_align * state_gt.block<3, 1>(5, 0);
-
+    Eigen::Matrix3d R_GtoI_est = ov_core::quat_2_Rot(q_est);
+    Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0));
+    
+    Eigen::Matrix3d R_gt2est = R_GtoI_est.transpose() * R_GtoI_gt;
+    double yaw = std::atan2(R_gt2est(1, 0), R_gt2est(0, 0));
+    R_align = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+    t_align = p_est - R_align * state_gt.block<3, 1>(5, 0);
     gt_aligned = true;
-    PRINT_INFO(GREEN "Ground Truth Aligned! Yaw offset: %.2f deg, Trans: [%.2f, %.2f, %.2f]\n" RESET,
-               align_yaw * 180.0 / M_PI, align_t(0), align_t(1), align_t(2));
+    
+    PRINT_INFO(GREEN "[GT-ALIGN] yaw offset %.1f deg, t = (%.2f, %.2f, %.2f)\n" RESET,
+               yaw * 180.0 / M_PI, t_align(0), t_align(1), t_align(2));
   }
 
-  Eigen::Matrix3d R_align = Eigen::AngleAxisd(align_yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-  
-  Eigen::Vector3d p_gt_orig = state_gt.block<3, 1>(5, 0);
-  state_gt.block<3, 1>(5, 0) = R_align * p_gt_orig + align_t;
+  state_gt.block<3, 1>(5, 0) = R_align * state_gt.block<3, 1>(5, 0).eval() + t_align;
+  Eigen::Matrix3d R_GtoI_gt = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0));
+  state_gt.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_GtoI_gt * R_align.transpose());
+  // =========================================================================
 
-  Eigen::Matrix3d R_gt_orig = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0)).transpose();
-  Eigen::Matrix3d R_gt_new = R_align * R_gt_orig;
-  state_gt.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_gt_new.transpose());
-
-  // Create pose of IMU
+  // Create pose of IMU for visualization
   geometry_msgs::msg::PoseStamped poseIinM;
   poseIinM.header.stamp = ROSVisualizerHelper::get_time_from_seconds(timestamp_inI);
   poseIinM.header.frame_id = "drone0/ov_odom";
@@ -925,12 +909,8 @@ void ROS2Visualizer::publish_groundtruth() {
   poseIinM.pose.position.z = state_gt(7, 0);
   pub_posegt->publish(poseIinM);
 
-  // Append to our pose vector
+  // Append to our pose vector and publish path
   poses_gt.push_back(poseIinM);
-
-  // Create our path (imu)
-  // NOTE: We downsample the number of poses as needed to prevent rviz crashes
-  // NOTE: https://github.com/ros-visualization/rviz/issues/1107
   nav_msgs::msg::Path arrIMU;
   arrIMU.header.stamp = _node->now();
   arrIMU.header.frame_id = "drone0/ov_odom";
@@ -939,26 +919,22 @@ void ROS2Visualizer::publish_groundtruth() {
   }
   pub_pathgt->publish(arrIMU);
 
-  // Publish our transform on TF
-  geometry_msgs::msg::TransformStamped trans;
-  trans.header.stamp = _node->now();
-  trans.header.frame_id = "drone0/ov_odom";
-  trans.child_frame_id = "truth";
-  trans.transform.rotation.x = state_gt(1, 0);
-  trans.transform.rotation.y = state_gt(2, 0);
-  trans.transform.rotation.z = state_gt(3, 0);
-  trans.transform.rotation.w = state_gt(4, 0);
-  trans.transform.translation.x = state_gt(5, 0);
-  trans.transform.translation.y = state_gt(6, 0);
-  trans.transform.translation.z = state_gt(7, 0);
+  // Publish our transform on TF (optional)
   if (publish_global2imu_tf) {
+    geometry_msgs::msg::TransformStamped trans;
+    trans.header.stamp = _node->now();
+    trans.header.frame_id = "drone0/ov_odom";
+    trans.child_frame_id = "truth";
+    trans.transform.rotation.x = state_gt(1, 0);
+    trans.transform.rotation.y = state_gt(2, 0);
+    trans.transform.rotation.z = state_gt(3, 0);
+    trans.transform.rotation.w = state_gt(4, 0);
+    trans.transform.translation.x = state_gt(5, 0);
+    trans.transform.translation.y = state_gt(6, 0);
+    trans.transform.translation.z = state_gt(7, 0);
     mTfBr->sendTransform(trans);
   }
 
-  //==========================================================================
-  //==========================================================================
-
-  // Difference between positions
   double dx = state_ekf(4, 0) - state_gt(5, 0);
   double dy = state_ekf(5, 0) - state_gt(6, 0);
   double dz = state_ekf(6, 0) - state_gt(7, 0);
@@ -969,48 +945,17 @@ void ROS2Visualizer::publish_groundtruth() {
   quat_gt << state_gt(1, 0), state_gt(2, 0), state_gt(3, 0), state_gt(4, 0);
   quat_st << state_ekf(0, 0), state_ekf(1, 0), state_ekf(2, 0), state_ekf(3, 0);
   quat_diff = quat_multiply(quat_st, Inv(quat_gt));
-  double err_ori = (180 / M_PI) * 2 * quat_diff.block(0, 0, 3, 1).norm();
-
-  //==========================================================================
-  //==========================================================================
-
-  // Get covariance of pose
-  std::vector<std::shared_ptr<Type>> statevars;
-  statevars.push_back(_app->get_state()->_imu->q());
-  statevars.push_back(_app->get_state()->_imu->p());
-  Eigen::Matrix<double, 6, 6> covariance = StateHelper::get_marginal_covariance(_app->get_state(), statevars);
-
-  // Calculate NEES values
-  // NOTE: need to manually multiply things out to make static asserts work
-  // NOTE: https://github.com/rpng/open_vins/pull/226
-  // NOTE: https://github.com/rpng/open_vins/issues/236
-  // NOTE: https://gitlab.com/libeigen/eigen/-/issues/1664
-  Eigen::Vector3d quat_diff_vec = quat_diff.block(0, 0, 3, 1);
-  Eigen::Vector3d cov_vec = covariance.block(0, 0, 3, 3).inverse() * 2 * quat_diff.block(0, 0, 3, 1);
-  double ori_nees = 2 * quat_diff_vec.dot(cov_vec);
-  Eigen::Vector3d errpos = state_ekf.block(4, 0, 3, 1) - state_gt.block(5, 0, 3, 1);
-  double pos_nees = errpos.transpose() * covariance.block(3, 3, 3, 3).inverse() * errpos;
-
-  //==========================================================================
-  //==========================================================================
+  double err_ori = (180.0 / M_PI) * 2.0 * quat_diff.block<3, 1>(0, 0).norm();
 
   // Update our average variables
-  if (!std::isnan(ori_nees) && !std::isnan(pos_nees)) {
-    summed_mse_ori += err_ori * err_ori;
-    summed_mse_pos += err_pos * err_pos;
-    summed_nees_ori += ori_nees;
-    summed_nees_pos += pos_nees;
-    summed_number++;
-  }
+  summed_mse_ori += err_ori * err_ori;
+  summed_mse_pos += err_pos * err_pos;
+  summed_number++;
 
   // Nice display for the user
-  PRINT_INFO(REDPURPLE "error to gt => %.3f, %.3f (deg,m) | rmse => %.3f, %.3f (deg,m) | called %d times\n" RESET, err_ori, err_pos,
-             std::sqrt(summed_mse_ori / summed_number), std::sqrt(summed_mse_pos / summed_number), (int)summed_number);
-  PRINT_INFO(REDPURPLE "nees => %.1f, %.1f (ori,pos) | avg nees = %.1f, %.1f (ori,pos)\n" RESET, ori_nees, pos_nees,
-             summed_nees_ori / summed_number, summed_nees_pos / summed_number);
-
-  //==========================================================================
-  //==========================================================================
+  PRINT_INFO(REDPURPLE "error to gt => %.3f, %.3f (deg,m) | rmse => %.3f, %.3f (deg,m) | called %zu times\n" RESET, 
+             err_ori, err_pos,
+             std::sqrt(summed_mse_ori / summed_number), std::sqrt(summed_mse_pos / summed_number), summed_number);
 }
 
 void ROS2Visualizer::publish_loopclosure_information() {
