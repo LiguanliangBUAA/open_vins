@@ -883,6 +883,35 @@ void ROS2Visualizer::publish_groundtruth() {
   // Get the GT and system state state
   Eigen::Matrix<double, 16, 1> state_ekf = _app->get_state()->_imu->value();
 
+  if (!gt_aligned) {
+    Eigen::Vector4d q_est_vec = state_ekf.block<4, 1>(0, 0);
+    Eigen::Matrix3d R_GtoI_est = ov_core::quat_2_Rot(q_est_vec);
+    Eigen::Matrix3d R_ItoG_est = R_GtoI_est.transpose();
+
+    Eigen::Vector4d q_gt_vec = state_gt.block<4, 1>(1, 0);
+    Eigen::Matrix3d R_GtoI_gt = ov_core::quat_2_Rot(q_gt_vec);
+    Eigen::Matrix3d R_ItoG_gt = R_GtoI_gt.transpose();
+
+    Eigen::Matrix3d R_err = R_ItoG_est * R_ItoG_gt.transpose();
+    align_yaw = std::atan2(R_err(1, 0), R_err(0, 0));
+
+    Eigen::Matrix3d R_align = Eigen::AngleAxisd(align_yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+    align_t = state_ekf.block<3, 1>(4, 0) - R_align * state_gt.block<3, 1>(5, 0);
+
+    gt_aligned = true;
+    PRINT_INFO(GREEN "Ground Truth Aligned! Yaw offset: %.2f deg, Trans: [%.2f, %.2f, %.2f]\n" RESET,
+               align_yaw * 180.0 / M_PI, align_t(0), align_t(1), align_t(2));
+  }
+
+  Eigen::Matrix3d R_align = Eigen::AngleAxisd(align_yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+  
+  Eigen::Vector3d p_gt_orig = state_gt.block<3, 1>(5, 0);
+  state_gt.block<3, 1>(5, 0) = R_align * p_gt_orig + align_t;
+
+  Eigen::Matrix3d R_gt_orig = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0)).transpose();
+  Eigen::Matrix3d R_gt_new = R_align * R_gt_orig;
+  state_gt.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_gt_new.transpose());
+
   // Create pose of IMU
   geometry_msgs::msg::PoseStamped poseIinM;
   poseIinM.header.stamp = ROSVisualizerHelper::get_time_from_seconds(timestamp_inI);

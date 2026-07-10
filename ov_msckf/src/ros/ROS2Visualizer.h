@@ -220,6 +220,9 @@ protected:
   std::vector<geometry_msgs::msg::PoseStamped> poses_gt;
   bool publish_global2imu_tf = true;
   bool publish_calibration_tf = true;
+  bool gt_aligned = false;
+  double align_yaw = 0.0;
+  Eigen::Vector3d align_t = Eigen::Vector3d::Zero();
 
   // Files and if we should save total state
   bool save_total_state = false;
