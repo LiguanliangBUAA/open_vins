@@ -134,7 +134,7 @@ public:
 
   std::atomic<int> stat_gn_fail_nan{0};
   std::atomic<int> stat_gn_fail_nan_depth{0};
-  std::atomic<int> stat_gn_fail_tri{0};
+  std::atomic<int> stat_gn_fail_nan_tri{0};
   std::atomic<int> stat_gn_fail_dist{0};
   std::atomic<int> stat_gn_fail_baseline{0};
 
