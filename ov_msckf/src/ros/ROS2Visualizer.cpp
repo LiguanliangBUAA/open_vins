@@ -872,6 +872,8 @@ void ROS2Visualizer::publish_groundtruth() {
   }
 
   // Get the current system state estimate
+  Eigen::Matrix<double, 16, 1> state_ekf = _app->get_state()->_imu->value();
+
   Eigen::Matrix<double, 4, 1> q_est = state_ekf.block<4, 1>(0, 0); 
   Eigen::Vector3d p_est = state_ekf.block<3, 1>(4, 0);
 
