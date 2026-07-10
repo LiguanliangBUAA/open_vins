@@ -129,9 +129,12 @@ public:
 
   // GN output
   std::atomic<int> stat_gn_ok{0};
-  std::atomic<int> stat_gn_fail{0};
   std::atomic<int> stat_depth_init{0};
   std::atomic<int> stat_tri_init{0};
+
+  std::atomic<int> stat_gn_fail_nan{0};
+  std::atomic<int> stat_gn_fail_dist{0};
+  std::atomic<int> stat_gn_fail_baseline{0};
 
 protected:
   /// Contains options for the initializer process

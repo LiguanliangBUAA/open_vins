@@ -401,13 +401,30 @@ bool FeatureInitializer::single_gaussnewton(std::shared_ptr<Feature> feat,
     has_physical_depth = true;
   }
 
-  if (feat->p_FinA(2) < _options.min_dist || feat->p_FinA(2) > _options.max_dist ||
-      std::isnan(feat->p_FinA.norm())) {
-    stat_gn_fail++;
+  // if (feat->p_FinA(2) < _options.min_dist || feat->p_FinA(2) > _options.max_dist ||
+  //     std::isnan(feat->p_FinA.norm())) {
+  //   stat_gn_fail++;
+  //   return false;
+  // }
+  // if (!has_physical_depth && (feat->p_FinA.norm() / base_line_max) > _options.max_baseline) {
+  //   stat_gn_fail++;
+  //   return false;
+  // }
+
+  if (std::isnan(feat->p_FinA.norm())) {
+    stat_gn_fail_nan++;
     return false;
   }
+  
+  // If the feature is too close or too far, we consider it a failure
+  if (feat->p_FinA(2) < _options.min_dist || feat->p_FinA(2) > _options.max_dist) {
+    stat_gn_fail_dist++;
+    return false;
+  }
+
+  // If the feature does not have a physical depth prior and the baseline ratio is too large, we consider it a failure
   if (!has_physical_depth && (feat->p_FinA.norm() / base_line_max) > _options.max_baseline) {
-    stat_gn_fail++;
+    stat_gn_fail_baseline++;
     return false;
   }
 

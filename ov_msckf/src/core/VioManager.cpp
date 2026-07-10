@@ -744,16 +744,23 @@ std::string VioManager::get_init_stats() {
   int d_init = init->stat_depth_init.load();
   int t_init = init->stat_tri_init.load();
   int gn_ok = init->stat_gn_ok.load();
-  int gn_fail = init->stat_gn_fail.load();
+  // int gn_fail = init->stat_gn_fail.load();
+  int gn_fail_nan = init->stat_gn_fail_nan.load();
+  int gn_fail_dist = init->stat_gn_fail_dist.load();
+  int gn_fail_baseline = init->stat_gn_fail_baseline.load();
+
+  int total_fail = gn_fail_nan + gn_fail_dist + gn_fail_baseline;
+  double d_ratio = 100.0 * d_init / std::max(1, d_init + t_init);
+  double f_ratio = 100.0 * total_fail / std::max(1, total_fail + gn_ok);
 
   double depth_ratio = 100 * d_init / std::max(1, d_init + t_init);
-  double fail_ratio = 100 * gn_fail / std::max(1, gn_ok + gn_fail);
+  double fail_ratio = 100 * total_fail / std::max(1, gn_ok + total_fail);
 
   char buffer[512];
   snprintf(buffer, sizeof(buffer),
            "[INIT] depth %d | tri %d (%.1f%% depth)\n"
-           "[GN]   ok %d | fail %d (%.1f%% fail)",
+           "[GN]   ok %d | fail %d (%.1f%% fail) [NaN %d | dist %d | baseline %d]\n",
            d_init, t_init, depth_ratio,
-           gn_ok, gn_fail, fail_ratio);
+           gn_ok, total_fail, fail_ratio, gn_fail_nan, gn_fail_dist, gn_fail_baseline);
   return std::string(buffer);
 }
