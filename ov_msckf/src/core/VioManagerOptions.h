@@ -173,6 +173,7 @@ struct VioManagerOptions {
       slam_options.sigma_pix_sq = std::pow(slam_options.sigma_pix, 2);
       aruco_options.sigma_pix_sq = std::pow(aruco_options.sigma_pix, 2);
       parser->parse_config("zupt_chi2_multipler", zupt_options.chi2_multipler);
+      parser->parse_config("use_depth_residual", msckf_options.use_depth_residual);
     }
     PRINT_DEBUG("  Updater MSCKF Feats:\n");
     msckf_options.print();

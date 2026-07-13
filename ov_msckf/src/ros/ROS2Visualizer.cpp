@@ -884,9 +884,6 @@ void ROS2Visualizer::publish_groundtruth() {
     Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt.block(1, 0, 4, 1));
     Eigen::Matrix3d R_full = R_GtoI_est.transpose() * R_GtoI_gt;
 
-    Eigen::Vector3d ypr = R_full.eulerAngles(2, 1, 0) * 180.0 / M_PI;
-    PRINT_INFO("[ALIGN-DBG] R_full ypr = %.1f, %.1f, %.1f deg\n", ypr(0), ypr(1), ypr(2));
-
     double yaw = std::atan2(R_full(1, 0), R_full(0, 0));
     R_gt2est = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
     t_gt2est = p_est - R_gt2est * state_gt.block(5, 0, 3, 1);

@@ -40,6 +40,9 @@ struct UpdaterOptions {
   /// Covariance for our raw pixel measurements
   double sigma_pix_sq = 1;
 
+  /// Whether we should use depth residuals or not (if available)
+  bool use_depth_residual = true;
+
   /// Nice print function of what parameters we have loaded
   void print() {
     PRINT_DEBUG("    - chi2_multipler: %.1f\n", chi2_multipler);

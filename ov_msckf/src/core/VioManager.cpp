@@ -759,7 +759,7 @@ std::string VioManager::get_init_stats() {
   char buffer[512];
   snprintf(buffer, sizeof(buffer),
            "[INIT] depth %d | tri %d (%.1f%% depth)\n"
-           "[GN]   ok %d | fail %d (%.1f%% fail) [NaN %d | dist %d | baseline %d]\n",
+           "[GN]   ok %d | fail %d (%.1f%% fail) [NaN %d | dist %d | baseline %d]",
            d_init, t_init, depth_ratio,
            gn_ok, total_fail, fail_ratio, gn_fail_nan, gn_fail_dist, gn_fail_baseline);
   return std::string(buffer);

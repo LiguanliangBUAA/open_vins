@@ -144,9 +144,26 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
 
   // Calculate the max possible measurement size
   size_t max_meas_size = 0;
+
   for (size_t i = 0; i < feature_vec.size(); i++) {
     for (const auto &pair : feature_vec.at(i)->timestamps) {
-      max_meas_size += 2 * feature_vec.at(i)->timestamps[pair.first].size();
+      for (size_t m = 0; m < pair.second.size(); m++) {
+        
+        bool has_d = false;
+        
+        if (_options.use_depth_residual && 
+            feature_vec.at(i)->depths.find(pair.first) != feature_vec.at(i)->depths.end() && 
+            feature_vec.at(i)->depths.at(pair.first).size() > m &&
+            feature_vec.at(i)->depth_vars.find(pair.first) != feature_vec.at(i)->depth_vars.end() && 
+            feature_vec.at(i)->depth_vars.at(pair.first).size() > m) {
+            
+          if (feature_vec.at(i)->depths.at(pair.first).at(m) > 0.0f && 
+              feature_vec.at(i)->depth_vars.at(pair.first).at(m) > 0.0f) {
+            has_d = true;
+          }
+        }
+        max_meas_size += has_d ? 3 : 2;
+      }
     }
   }
 
@@ -176,6 +193,9 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     feat.uvs_norm = (*it2)->uvs_norm;
     feat.timestamps = (*it2)->timestamps;
 
+    feat.depths = (*it2)->depths;
+    feat.depth_vars = (*it2)->depth_vars;
+
     // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
     feat.feat_representation = state->_options.feat_rep_msckf;
     if (state->_options.feat_rep_msckf == LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) {
@@ -200,7 +220,7 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, _options.sigma_pix, _options.use_depth_residual);
 
     // Nullspace project
     UpdaterHelper::nullspace_project_inplace(H_f, H_x, res);
@@ -208,7 +228,8 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     /// Chi2 distance check
     Eigen::MatrixXd P_marg = StateHelper::get_marginal_covariance(state, Hx_order);
     Eigen::MatrixXd S = H_x * P_marg * H_x.transpose();
-    S.diagonal() += _options.sigma_pix_sq * Eigen::VectorXd::Ones(S.rows());
+    // S.diagonal() += _options.sigma_pix_sq * Eigen::VectorXd::Ones(S.rows());
+    S.diagonal() += Eigen::VectorXd::Ones(S.rows());
     double chi2 = res.dot(S.llt().solve(res));
 
     // Get our threshold (we precompute up to 500 but handle the case that it is more)
@@ -279,7 +300,8 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   rT4 = boost::posix_time::microsec_clock::local_time();
 
   // Our noise is isotropic, so make it here after our compression
-  Eigen::MatrixXd R_big = _options.sigma_pix_sq * Eigen::MatrixXd::Identity(res_big.rows(), res_big.rows());
+  // Eigen::MatrixXd R_big = _options.sigma_pix_sq * Eigen::MatrixXd::Identity(res_big.rows(), res_big.rows());
+  Eigen::MatrixXd R_big = Eigen::MatrixXd::Identity(res_big.rows(), res_big.rows());
 
   // 6. With all good features update the state
   StateHelper::EKFUpdate(state, Hx_order_big, Hx_big, res_big, R_big);
