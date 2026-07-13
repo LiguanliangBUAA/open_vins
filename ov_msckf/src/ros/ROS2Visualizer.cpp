@@ -886,15 +886,15 @@ void ROS2Visualizer::publish_groundtruth() {
 
     double yaw = std::atan2(R_full(1, 0), R_full(0, 0));
     R_gt2est = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-    t_gt2est = state->_imu->pos() - R_gt2est * state_gt.block(5, 0, 3, 1);
+    t_gt2est = p_est - R_gt2est * state_gt.block(5, 0, 3, 1);
     gt_aligned = true;
     
     PRINT_INFO(GREEN "[GT-ALIGN] SUCCESS! Full 3D Alignment. t = (%.2f, %.2f, %.2f)\n" RESET, t_gt2est(0), t_gt2est(1), t_gt2est(2));
   }
 
-  state_gt.block<3, 1>(5, 0) = R_gt2est * state_gt.block<3, 1>(5, 0).eval() + t_gt2est;
-  Eigen::Matrix3d R_GtoI_gt = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0));
-  state_gt.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_GtoI_gt * R_gt2est.transpose());
+  state_gt.block(5, 0, 3, 1) = (R_gt2est * state_gt.block(5, 0, 3, 1)).eval() + t_gt2est;
+  Eigen::Matrix3d R_tmp = ov_core::quat_2_Rot(state_gt.block(1, 0, 4, 1));
+  state_gt.block(1, 0, 4, 1) = ov_core::rot_2_quat(R_tmp * R_gt2est.transpose());
   // =========================================================================
 
   // Create pose of IMU for visualization
