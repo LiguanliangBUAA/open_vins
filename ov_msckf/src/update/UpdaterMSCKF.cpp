@@ -220,8 +220,8 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     if (it2 == feature_vec.begin()) {
-        PRINT_INFO(YELLOW "[DEBUG] UpdaterMSCKF: use_depth=%d, hfeat.depths.size()=%zu\n" RESET, 
-                   _options.use_depth_residual, hfeat.depths.size());
+        PRINT_INFO(YELLOW "[DEBUG] UpdaterMSCKF: use_depth=%d, feat.depths.size()=%zu\n" RESET, 
+                   _options.use_depth_residual, feat.depths.size());
     }
 
     // Get the Jacobian for this feature
