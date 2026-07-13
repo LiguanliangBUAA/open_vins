@@ -220,6 +220,7 @@ protected:
   std::vector<geometry_msgs::msg::PoseStamped> poses_gt;
   bool publish_global2imu_tf = true;
   bool publish_calibration_tf = true;
+  // Groundtruth alignment information
   bool gt_aligned = false;
   int align_frame_count = 0;
   Eigen::Matrix3d R_gt2est = Eigen::Matrix3d::Identity();
