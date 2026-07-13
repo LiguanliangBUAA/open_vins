@@ -182,7 +182,8 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, _options.sigma_pix, false);
+    double sigma_pix = ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix : _options_slam.sigma_pix;
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, sigma_pix, false);
 
     // If we are doing the single feature representation, then we need to remove the bearing portion
     // To do so, we project the bearing portion onto the state and depth Jacobians and the residual.
@@ -223,9 +224,7 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
     }
 
     // Measurement noise matrix
-    double sigma_pix_sq =
-        ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix_sq : _options_slam.sigma_pix_sq;
-    Eigen::MatrixXd R = sigma_pix_sq * Eigen::MatrixXd::Identity(res.rows(), res.rows());
+    Eigen::MatrixXd R = Eigen::MatrixXd::Identity(res.rows(), res.rows());
 
     // Try to initialize, delete new pointer if we failed
     double chi2_multipler =
@@ -359,7 +358,8 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, _options.sigma_pix, false);
+    double current_sigma_pix = ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix : _options_slam.sigma_pix;
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, current_sigma_pix, false);
 
     // Place Jacobians in one big Jacobian, since the landmark is already in our state vector
     Eigen::MatrixXd H_xf = H_x;
@@ -389,9 +389,7 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
     // Chi2 distance check
     Eigen::MatrixXd P_marg = StateHelper::get_marginal_covariance(state, Hxf_order);
     Eigen::MatrixXd S = H_xf * P_marg * H_xf.transpose();
-    double sigma_pix_sq =
-        ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix_sq : _options_slam.sigma_pix_sq;
-    S.diagonal() += sigma_pix_sq * Eigen::VectorXd::Ones(S.rows());
+    S.diagonal() += Eigen::VectorXd::Ones(S.rows());
     double chi2 = res.dot(S.llt().solve(res));
 
     // Get our threshold (we precompute up to 500 but handle the case that it is more)
@@ -441,7 +439,7 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
     }
 
     // Our isotropic measurement noise
-    R_big.block(ct_meas, ct_meas, res.rows(), res.rows()) *= sigma_pix_sq;
+    // R_big.block(ct_meas, ct_meas, res.rows(), res.rows()) *= sigma_pix_sq;
 
     // Append our residual and move forward
     res_big.block(ct_meas, 0, res.rows(), 1) = res;
