@@ -181,13 +181,13 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
       [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
         Eigen::Matrix<double, 17, 1> gt = Eigen::Matrix<double, 17, 1>::Zero();
         gt(0) = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
-        gt(1) = msg->pose.orientation.x;
-        gt(2) = msg->pose.orientation.y;
-        gt(3) = msg->pose.orientation.z;
+        gt(1) = msg->pose.position.x;
+        gt(2) = msg->pose.position.y;
+        gt(3) = msg->pose.position.z;
         gt(4) = msg->pose.orientation.w;
-        gt(5) = msg->pose.position.x;
-        gt(6) = msg->pose.position.y;
-        gt(7) = msg->pose.position.z;
+        gt(5) = msg->pose.orientation.x;
+        gt(6) = msg->pose.orientation.y;
+        gt(7) = msg->pose.orientation.z;
         std::lock_guard<std::mutex> lck(gt_mtx);
         gt_states[gt(0)] = gt;
       });
