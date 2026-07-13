@@ -193,6 +193,13 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
                                               Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<Type>> &x_order,
                                               double sigma_pix, bool use_depth_residual) {
 
+  auto check_has_depth = [&](size_t cam_id, size_t m) -> bool {
+    if (!use_depth_residual) return false;
+    if (feature.depths.find(cam_id) == feature.depths.end() || feature.depths.at(cam_id).size() <= m) return false;
+    if (feature.depth_vars.find(cam_id) == feature.depth_vars.end() || feature.depth_vars.at(cam_id).size() <= m) return false;
+    return (feature.depths.at(cam_id).at(m) > 0.0f && feature.depth_vars.at(cam_id).at(m) > 0.0f);
+  };
+
   // Total number of measurements for this feature
   int total_hx = 0;
   int total_rows = 0;
@@ -224,15 +231,22 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
         total_hx += clone_Ci->size();
       }
 
-      bool has_d = false;
-      if (use_depth_residual && 
-          feature.depths.find(pair.first) != feature.depths.end() && feature.depths.at(pair.first).size() > m &&
-          feature.depth_vars.find(pair.first) != feature.depth_vars.end() && feature.depth_vars.at(pair.first).size() > m) {
-        if (feature.depths.at(pair.first).at(m) > 0.0f && feature.depth_vars.at(pair.first).at(m) > 0.0f) {
-          has_d = true;
-        }
+      total_rows += check_has_depth(pair.first, m) ? 3 : 2; // 2 for uv, 1 for depth
+    }
+  }
+
+  // Anchor registeration
+  if (LandmarkRepresentation::is_relative_representation(feature.feat_representation)) {
+    assert(feature.anchor_cam_id != -1);
+    std::shared_ptr<PoseJPL> clone_Ai = state->_clones_IMU.at(feature.anchor_clone_timestamp);
+    if (map_hx.find(clone_Ai) == map_hx.end()) {
+      map_hx.insert({clone_Ai, total_hx}); x_order.push_back(clone_Ai); total_hx += clone_Ai->size();
+    }
+    if (state->_options.do_calib_camera_pose) {
+      std::shared_ptr<PoseJPL> clone_calib = state->_calib_IMUtoCAM.at(feature.anchor_cam_id);
+      if (map_hx.find(clone_calib) == map_hx.end()) {
+        map_hx.insert({clone_calib, total_hx}); x_order.push_back(clone_calib); total_hx += clone_calib->size();
       }
-      total_rows += has_d ? 3 : 2; // 2 for uv, 1 for depth
     }
   }
   
@@ -261,9 +275,9 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
   // Allocate our residual and Jacobians
   int jacobsize = (feature.feat_representation != LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) ? 3 : 1;
-  res = Eigen::VectorXd::Zero(2 * total_rows);
-  H_f = Eigen::MatrixXd::Zero(2 * total_rows, jacobsize);
-  H_x = Eigen::MatrixXd::Zero(2 * total_rows, total_hx);
+  res = Eigen::VectorXd::Zero(total_rows);
+  H_f = Eigen::MatrixXd::Zero(total_rows, jacobsize);
+  H_x = Eigen::MatrixXd::Zero(total_rows, total_hx);
 
   // Derivative of p_FinG in respect to feature representation.
   // This only needs to be computed once and thus we pull it out of the loop
@@ -271,6 +285,10 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
   std::vector<Eigen::MatrixXd> dpfg_dx;
   std::vector<std::shared_ptr<Type>> dpfg_dx_order;
   UpdaterHelper::get_feature_jacobian_representation(state, feature, dpfg_dlambda, dpfg_dx, dpfg_dx_order);
+
+#ifndef NDEBUG
+  for (auto &type : dpfg_dx_order) { assert(map_hx.find(type) != map_hx.end());}
+#endif
 
   int row = 0;
 
@@ -303,7 +321,6 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
       // Compute the residual (uv_meas - uv_pred) and weight it by the pixel noise
       Eigen::Vector2d uv_m((double)feature.uvs[pair.first].at(m)(0), (double)feature.uvs[pair.first].at(m)(1));
-      
       double weight_pix = 1.0 / sigma_pix;
       res.block(row, 0, 2, 1) = (uv_m - uv_dist) * weight_pix;
 
