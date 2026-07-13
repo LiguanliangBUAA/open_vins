@@ -156,6 +156,9 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
     feat.uvs_norm = (*it2)->uvs_norm;
     feat.timestamps = (*it2)->timestamps;
 
+    // feat.depths = (*it2)->depths;
+    // feat.depth_vars = (*it2)->depth_vars;
+
     // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
     auto feat_rep =
         ((int)feat.featid < state->_options.max_aruco_features) ? state->_options.feat_rep_aruco : state->_options.feat_rep_slam;
@@ -333,6 +336,9 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
     feat.uvs = (*it2)->uvs;
     feat.uvs_norm = (*it2)->uvs_norm;
     feat.timestamps = (*it2)->timestamps;
+
+    // feat.depths = (*it2)->depths;
+    // feat.depth_vars = (*it2)->depth_vars;
 
     // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
     feat.feat_representation = landmark->_feat_representation;

@@ -392,6 +392,69 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
           dpfc_dcalib.block(0, 3, 3, 3) = Eigen::Matrix<double, 3, 3>::Identity();
           H_x.block(row + 2, map_hx[calibration], 1, 6).noalias() += (dzd_dpfc * dpfc_dcalib) * weight_z;
         }
+        // NUMERICAL JACOBIAN CHECK
+        static int check_cnt = 0;
+        // Check the Jacobians numerically for the first 3 features
+        if (check_cnt < 3) {
+          check_cnt++;
+          double eps = 1e-6;
+          
+          // Test camera pose (H_x_clone)
+          Eigen::MatrixXd H_num_x = Eigen::MatrixXd::Zero(3, 6);
+          for (int j = 0; j < 6; j++) {
+            Eigen::VectorXd dx = Eigen::VectorXd::Zero(6);
+            dx(j) = eps;
+            
+            Eigen::Matrix3d R_plus = (Eigen::Matrix3d::Identity() - ov_core::skew_x(dx.head<3>())) * R_GtoIi;
+            Eigen::Vector3d p_plus = p_IiinG + dx.tail<3>();
+            Eigen::Matrix3d R_minus = (Eigen::Matrix3d::Identity() + ov_core::skew_x(dx.head<3>())) * R_GtoIi;
+            Eigen::Vector3d p_minus = p_IiinG - dx.tail<3>();
+            
+            // Predict Plus
+            Eigen::Vector3d p_FinCi_plus = R_ItoC * (R_plus * (p_FinG - p_plus)) + p_IinC;
+            Eigen::Vector2d uv_plus = state->_cam_intrinsics_cameras.at(pair.first)->distort_d(
+                Eigen::Vector2d(p_FinCi_plus(0)/p_FinCi_plus(2), p_FinCi_plus(1)/p_FinCi_plus(2)));
+            // Predict Minus
+            Eigen::Vector3d p_FinCi_minus = R_ItoC * (R_minus * (p_FinG - p_minus)) + p_IinC;
+            Eigen::Vector2d uv_minus = state->_cam_intrinsics_cameras.at(pair.first)->distort_d(
+                Eigen::Vector2d(p_FinCi_minus(0)/p_FinCi_minus(2), p_FinCi_minus(1)/p_FinCi_minus(2)));
+
+            H_num_x.block(0, j, 2, 1) = (uv_plus - uv_minus) / (2.0 * eps) * weight_pix;
+            H_num_x(2, j) = (p_FinCi_plus(2) - p_FinCi_minus(2)) / (2.0 * eps) * weight_z;
+          }
+          
+          Eigen::MatrixXd H_ana_x = H_x.block(row, map_hx[clone_Ii], 3, 6);
+          double err_x = (H_num_x - H_ana_x).norm();
+          
+          // Test 3D feature point position Jacobian (H_f_global)
+          Eigen::MatrixXd H_num_fg = Eigen::MatrixXd::Zero(3, 3);
+          for (int j = 0; j < 3; j++) {
+            Eigen::Vector3d dx = Eigen::Vector3d::Zero();
+            dx(j) = eps;
+            
+            Eigen::Vector3d p_FinCi_plus = R_ItoC * (R_GtoIi * (p_FinG + dx - p_IiinG)) + p_IinC;
+            Eigen::Vector2d uv_plus = state->_cam_intrinsics_cameras.at(pair.first)->distort_d(
+                Eigen::Vector2d(p_FinCi_plus(0)/p_FinCi_plus(2), p_FinCi_plus(1)/p_FinCi_plus(2)));
+                
+            Eigen::Vector3d p_FinCi_minus = R_ItoC * (R_GtoIi * (p_FinG - dx - p_IiinG)) + p_IinC;
+            Eigen::Vector2d uv_minus = state->_cam_intrinsics_cameras.at(pair.first)->distort_d(
+                Eigen::Vector2d(p_FinCi_minus(0)/p_FinCi_minus(2), p_FinCi_minus(1)/p_FinCi_minus(2)));
+                
+            H_num_fg.block(0, j, 2, 1) = (uv_plus - uv_minus) / (2.0 * eps) * weight_pix;
+            H_num_fg(2, j) = (p_FinCi_plus(2) - p_FinCi_minus(2)) / (2.0 * eps) * weight_z;
+          }
+          
+          Eigen::MatrixXd H_ana_fg = Eigen::MatrixXd::Zero(3, 3);
+          H_ana_fg.block(0, 0, 2, 3) = dz_dpfg * weight_pix;
+          H_ana_fg.block(2, 0, 1, 3) = dzd_dpfg * weight_z;
+          double err_fg = (H_num_fg - H_ana_fg).norm();
+          
+          if (err_x > 1e-4 || err_fg > 1e-4) {
+             PRINT_INFO(RED "[JACOBIAN FAILED] err_x: %.2e, err_f: %.2e\n" RESET, err_x, err_fg);
+          } else {
+             PRINT_INFO(GREEN "[JACOBIAN PASSED] err_x: %.2e, err_f: %.2e\n" RESET, err_x, err_fg);
+          }
+        }
       }
 
       // Cursor advancement
