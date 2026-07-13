@@ -219,6 +219,11 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     Eigen::VectorXd res;
     std::vector<std::shared_ptr<Type>> Hx_order;
 
+    if (it2 == feature_vec.begin()) {
+        PRINT_INFO(YELLOW "[DEBUG] UpdaterMSCKF: use_depth=%d, hfeat.depths.size()=%zu\n" RESET, 
+                   _options.use_depth_residual, hfeat.depths.size());
+    }
+
     // Get the Jacobian for this feature
     UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, _options.sigma_pix, _options.use_depth_residual);
 
