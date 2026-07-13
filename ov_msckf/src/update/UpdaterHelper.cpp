@@ -261,9 +261,9 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
 
   // Allocate our residual and Jacobians
   int jacobsize = (feature.feat_representation != LandmarkRepresentation::Representation::ANCHORED_INVERSE_DEPTH_SINGLE) ? 3 : 1;
-  res = Eigen::VectorXd::Zero(2 * total_meas);
-  H_f = Eigen::MatrixXd::Zero(2 * total_meas, jacobsize);
-  H_x = Eigen::MatrixXd::Zero(2 * total_meas, total_hx);
+  res = Eigen::VectorXd::Zero(2 * total_rows);
+  H_f = Eigen::MatrixXd::Zero(2 * total_rows, jacobsize);
+  H_x = Eigen::MatrixXd::Zero(2 * total_rows, total_hx);
 
   // Derivative of p_FinG in respect to feature representation.
   // This only needs to be computed once and thus we pull it out of the loop
