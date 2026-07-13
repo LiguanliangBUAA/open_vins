@@ -221,8 +221,9 @@ protected:
   bool publish_global2imu_tf = true;
   bool publish_calibration_tf = true;
   bool gt_aligned = false;
-  Eigen::Matrix3d R_align = Eigen::Matrix3d::Identity();
-  Eigen::Vector3d t_align = Eigen::Vector3d::Zero();
+  int align_frame_count = 0;
+  Eigen::Matrix3d R_gt2est = Eigen::Matrix3d::Identity();
+  Eigen::Vector3d t_gt2est = Eigen::Vector3d::Zero();
 
   // Files and if we should save total state
   bool save_total_state = false;

@@ -878,21 +878,23 @@ void ROS2Visualizer::publish_groundtruth() {
   Eigen::Vector3d p_est = state_ekf.block<3, 1>(4, 0);
 
   if (!gt_aligned) {
+    align_frame_count++;
+    if (align_frame_count < 10) return;
     Eigen::Matrix3d R_GtoI_est = ov_core::quat_2_Rot(q_est);
-    Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0));
-    
-    R_align = R_GtoI_est.transpose() * R_GtoI_gt; 
-    t_align = p_est - R_align * state_gt.block<3, 1>(5, 0);
+    Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt.block(1, 0, 4, 1));
+    Eigen::Matrix3d R_full = R_GtoI_est.transpose() * R_GtoI_gt;
+
+    double yaw = std::atan2(R_full(1, 0), R_full(0, 0));
+    R_gt2est = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
+    t_gt2est = state->_imu->pos() - R_gt2est * state_gt.block(5, 0, 3, 1);
     gt_aligned = true;
     
-    PRINT_INFO(GREEN "\n=======================================================\n" RESET);
-    PRINT_INFO(GREEN "[GT-ALIGN] SUCCESS! Full 3D Alignment. t = (%.2f, %.2f, %.2f)\n" RESET, t_align(0), t_align(1), t_align(2));
-    PRINT_INFO(GREEN "=======================================================\n\n" RESET);
+    PRINT_INFO(GREEN "[GT-ALIGN] SUCCESS! Full 3D Alignment. t = (%.2f, %.2f, %.2f)\n" RESET, t_gt2est(0), t_gt2est(1), t_gt2est(2));
   }
 
-  state_gt.block<3, 1>(5, 0) = R_align * state_gt.block<3, 1>(5, 0).eval() + t_align;
+  state_gt.block<3, 1>(5, 0) = R_gt2est * state_gt.block<3, 1>(5, 0).eval() + t_gt2est;
   Eigen::Matrix3d R_GtoI_gt = ov_core::quat_2_Rot(state_gt.block<4, 1>(1, 0));
-  state_gt.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_GtoI_gt * R_align.transpose());
+  state_gt.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_GtoI_gt * R_gt2est.transpose());
   // =========================================================================
 
   // Create pose of IMU for visualization
