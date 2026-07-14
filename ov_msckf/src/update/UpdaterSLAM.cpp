@@ -156,8 +156,8 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
     feat.uvs_norm = (*it2)->uvs_norm;
     feat.timestamps = (*it2)->timestamps;
 
-    // feat.depths = (*it2)->depths;
-    // feat.depth_vars = (*it2)->depth_vars;
+    feat.depths = (*it2)->depths;
+    feat.depth_vars = (*it2)->depth_vars;
 
     // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
     auto feat_rep =
@@ -186,7 +186,7 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
 
     // Get the Jacobian for this feature
     double sigma_pix = ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix : _options_slam.sigma_pix;
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, sigma_pix, false);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, sigma_pix, _options_slam.use_depth_residual);
 
     // If we are doing the single feature representation, then we need to remove the bearing portion
     // To do so, we project the bearing portion onto the state and depth Jacobians and the residual.
@@ -337,8 +337,8 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
     feat.uvs_norm = (*it2)->uvs_norm;
     feat.timestamps = (*it2)->timestamps;
 
-    // feat.depths = (*it2)->depths;
-    // feat.depth_vars = (*it2)->depth_vars;
+    feat.depths = (*it2)->depths;
+    feat.depth_vars = (*it2)->depth_vars;
 
     // If we are using single inverse depth, then it is equivalent to using the msckf inverse depth
     feat.feat_representation = landmark->_feat_representation;
@@ -365,7 +365,7 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
 
     // Get the Jacobian for this feature
     double current_sigma_pix = ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix : _options_slam.sigma_pix;
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, current_sigma_pix, false);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, current_sigma_pix, _options_slam.use_depth_residual);
 
     // Place Jacobians in one big Jacobian, since the landmark is already in our state vector
     Eigen::MatrixXd H_xf = H_x;
