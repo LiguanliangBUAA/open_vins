@@ -52,5 +52,6 @@ else ()
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ROS1.cmake)
 endif ()
 
-
+add_executable(test_jacobian_depth src/test_jacobian_depth.cpp)
+target_link_libraries(test_jacobian_depth ov_msckf_lib ${thirdparty_libraries})
 
