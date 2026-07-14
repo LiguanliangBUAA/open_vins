@@ -44,6 +44,11 @@ launch_args = [
         name="save_total_state",
         default_value="false",
         description="record the total state with calibration and features to a txt file",
+    ),
+    DeclareLaunchArgument(
+        name="use_sim_time",
+        default_value="false",
+        description="use simulation time instead of system time"
     )
 ]
 
@@ -81,6 +86,7 @@ def launch_setup(context):
         namespace=LaunchConfiguration("namespace"),
         output='screen',
         parameters=[
+            {"use_sim_time": LaunchConfiguration("use_sim_time")},
             {"verbosity": LaunchConfiguration("verbosity")},
             {"use_stereo": LaunchConfiguration("use_stereo")},
             {"max_cameras": LaunchConfiguration("max_cameras")},
@@ -93,6 +99,7 @@ def launch_setup(context):
         package="rviz2",
         executable="rviz2",
         condition=IfCondition(LaunchConfiguration("rviz_enable")),
+        parameters=[{"use_sim_time": LaunchConfiguration("use_sim_time")}],
         arguments=[
             "-d"
             + os.path.join(
