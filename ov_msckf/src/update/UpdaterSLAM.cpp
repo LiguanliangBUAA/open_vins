@@ -300,10 +300,35 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
   rT1 = boost::posix_time::microsec_clock::local_time();
 
   // Calculate the max possible measurement size
+  // size_t max_meas_size = 0;
+  // for (size_t i = 0; i < feature_vec.size(); i++) {
+  //   for (const auto &pair : feature_vec.at(i)->timestamps) {
+  //     max_meas_size += 2 * feature_vec.at(i)->timestamps[pair.first].size();
+  //   }
+  // }
+
   size_t max_meas_size = 0;
+
   for (size_t i = 0; i < feature_vec.size(); i++) {
     for (const auto &pair : feature_vec.at(i)->timestamps) {
-      max_meas_size += 2 * feature_vec.at(i)->timestamps[pair.first].size();
+      for (size_t m = 0; m < pair.second.size(); m++) {
+        
+        bool has_d = false;
+        
+        if (_options_slam.use_depth_residual && 
+            feature_vec.at(i)->depths.find(pair.first) != feature_vec.at(i)->depths.end() && 
+            feature_vec.at(i)->depths.at(pair.first).size() > m &&
+            feature_vec.at(i)->depth_vars.find(pair.first) != feature_vec.at(i)->depth_vars.end() && 
+            feature_vec.at(i)->depth_vars.at(pair.first).size() > m) {
+            
+          if (feature_vec.at(i)->depths.at(pair.first).at(m) > 0.0f && 
+              feature_vec.at(i)->depth_vars.at(pair.first).at(m) > 0.0f) {
+            has_d = true;
+          }
+        }
+        
+        max_meas_size += has_d ? 3 : 2;
+      }
     }
   }
 
