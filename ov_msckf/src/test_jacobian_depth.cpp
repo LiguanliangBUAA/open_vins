@@ -77,7 +77,7 @@ Eigen::VectorXd compute_res(std::shared_ptr<State> state, UpdaterHelper::Updater
 }
 
 int main() {
-  const double eps = 1e-6;
+  const double eps = 1e-5;
   const double tol = 1e-4;   // FD truncation ~eps^2 rel; whitened units make 1e-4 a safe gate
   const double sigma_pix = 1.5;   // deliberately != 1 to catch sigma/sigma^2 bugs!
   bool use_depth = true;
@@ -136,8 +136,15 @@ int main() {
     Eigen::VectorXd Hcol_num = -(res_p - res_m) / (2 * eps);
     double err = (Hcol_num - Hcol_analytic).norm() / std::max(1.0, Hcol_analytic.norm());
     bool ok = err < tol;
-    if (!ok) failures++;
-    printf("%-28s col %d : rel_err = %.3e  %s\n", name.c_str(), col, err, ok ? "OK" : "  <-- FAIL");
+    if (!ok) {
+      failures++;
+      Eigen::VectorXd diff = (Hcol_num - Hcol_analytic).cwiseAbs();
+      std::cout << name << " col " << col << " : rel_err = " << err << "  <-- FAIL\n"
+                << "    per-row |diff|: " << diff.transpose() << "\n"
+                << "    analytic:       " << Hcol_analytic.transpose() << "\n";
+    } else {
+      printf("%-28s col %d : rel_err = %.3e  OK\n", name.c_str(), col, err);
+    }
   };
 
   // ---- H_f: perturb p_FinG ----
@@ -158,8 +165,8 @@ int main() {
     for (int j = 0; j < 3; j++) {
       Eigen::VectorXd dtp = Eigen::VectorXd::Zero(3); dtp(j) = eps;
       Eigen::Matrix<double, 7, 1> vp = pose->value(), vm = pose->value();
-      vp.block(0,0,4,1) = ov_core::quat_multiply(ov_core::rot_2_quat(ov_core::exp_so3( dtp)), pose->quat());
-      vm.block(0,0,4,1) = ov_core::quat_multiply(ov_core::rot_2_quat(ov_core::exp_so3(-dtp)), pose->quat());
+      vp.block(0,0,4,1) = ov_core::quat_multiply(ov_core::rot_2_quat(ov_core::exp_so3(-dtp)), pose->quat());
+      vm.block(0,0,4,1) = ov_core::quat_multiply(ov_core::rot_2_quat(ov_core::exp_so3( dtp)), pose->quat());
       Eigen::Matrix<double,7,1> orig = pose->value();
       pose->set_value(vp); pose->set_fej(vp);
       Eigen::VectorXd rp = compute_res(state, feat, sigma_pix, use_depth);
