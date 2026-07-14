@@ -175,23 +175,28 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
   PRINT_INFO("subscribing to IMU: %s\n", topic_imu.c_str());
 
   // Load groundtruth from a live topic (Gazebo simulation)
-  std::string topic_gt = "/drone0/ground_truth/pose";
-  sub_gt = _node->create_subscription<geometry_msgs::msg::PoseStamped>(
-      topic_gt, rclcpp::SensorDataQoS(),
-      [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
-        Eigen::Matrix<double, 17, 1> gt = Eigen::Matrix<double, 17, 1>::Zero();
-        gt(0) = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
-        gt(1) = msg->pose.position.x;
-        gt(2) = msg->pose.position.y;
-        gt(3) = msg->pose.position.z;
-        gt(4) = msg->pose.orientation.w;
-        gt(5) = msg->pose.orientation.x;
-        gt(6) = msg->pose.orientation.y;
-        gt(7) = msg->pose.orientation.z;
-        std::lock_guard<std::mutex> lck(gt_mtx);
-        gt_states[gt(0)] = gt;
-      });
-  PRINT_INFO("subscribing to groundtruth: %s\n", topic_gt.c_str());
+  bool use_gt_topic = false;
+  parser->parse_config("use_gt_topic", use_gt_topic, false);
+  if (use_gt_topic) {
+    std::string topic_gt = "/drone0/ground_truth/pose";
+    parser->parse_config("topic_gt", topic_gt, false);
+    sub_gt = _node->create_subscription<geometry_msgs::msg::PoseStamped>(
+        topic_gt, rclcpp::SensorDataQoS(),
+        [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
+          Eigen::Matrix<double, 17, 1> gt = Eigen::Matrix<double, 17, 1>::Zero();
+          gt(0) = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
+          gt(1) = msg->pose.position.x;
+          gt(2) = msg->pose.position.y;
+          gt(3) = msg->pose.position.z;
+          gt(4) = msg->pose.orientation.w;
+          gt(5) = msg->pose.orientation.x;
+          gt(6) = msg->pose.orientation.y;
+          gt(7) = msg->pose.orientation.z;
+          std::lock_guard<std::mutex> lck(gt_mtx);
+          gt_states[gt(0)] = gt;
+        });
+    PRINT_INFO("subscribing to groundtruth: %s\n", topic_gt.c_str());
+  }
 
   // IMAV subscribe setup
   bool use_imav_setup = false;
