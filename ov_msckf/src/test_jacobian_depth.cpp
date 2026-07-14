@@ -93,11 +93,11 @@ int main() {
   UpdaterHelper::UpdaterHelperFeature feat;
   feat.featid = 1;
   feat.feat_representation = LandmarkRepresentation::Representation::GLOBAL_3D;
-  feat.p_FinG = p_FinG + Eigen::Vector3d(0.01, -0.02, 0.03); // linearization point != truth
+  feat.p_FinG = p_FinG; // + Eigen::Vector3d(0.01, -0.02, 0.03); // linearization point != truth
   feat.p_FinG_fej = feat.p_FinG;
 
   std::mt19937 gen(7);
-  std::normal_distribution<double> px_noise(0.0, 0.5);
+  std::normal_distribution<double> px_noise(0.0, 0.0);
   auto calib = state->_calib_IMUtoCAM.at(0);
   for (double t : times) {
     auto clone = state->_clones_IMU.at(t);
@@ -114,7 +114,7 @@ int main() {
     // depth on observations 0 and 2 only (mixed 2/3-row layout on purpose)
     size_t m = feat.timestamps[0].size() - 1;
     if (m == 0 || m == 2) {
-      feat.depths[0].push_back((float)(p_FinC(2) + 0.02));
+      feat.depths[0].push_back((float)(p_FinC(2)));
       float sz = (float)(0.01 * p_FinC(2) * p_FinC(2));   // sigma_z ~ z^2 model
       feat.depth_vars[0].push_back(sz * sz);
     } else {
