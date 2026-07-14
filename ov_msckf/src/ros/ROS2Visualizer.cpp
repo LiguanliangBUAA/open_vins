@@ -893,6 +893,23 @@ void ROS2Visualizer::publish_groundtruth() {
     R_gt2est = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
     t_gt2est = p_est - R_gt2est * state_gt.block(5, 0, 3, 1);
     gt_aligned = true;
+    geometry_msgs::msg::TransformStamped trans;
+    trans.header.stamp = _node->now();
+    trans.header.frame_id = "drone0/odom";
+    trans.child_frame_id = "drone0/ov_odom";
+    
+    Eigen::Vector4d q_align = ov_core::rot_2_quat(R_gt2est.transpose());
+    Eigen::Vector3d t_inv = -R_gt2est.transpose() * t_gt2est;
+    
+    trans.transform.rotation.x = q_align(1);
+    trans.transform.rotation.y = q_align(2);
+    trans.transform.rotation.z = q_align(3);
+    trans.transform.rotation.w = q_align(0);
+    trans.transform.translation.x = t_inv(0);
+    trans.transform.translation.y = t_inv(1);
+    trans.transform.translation.z = t_inv(2);
+    
+    mTfBr->sendTransform(trans);
     PRINT_INFO(GREEN "[GT-ALIGN] yaw %.1f deg (one-time)\n" RESET, yaw * 180.0 / M_PI);
   }
 
