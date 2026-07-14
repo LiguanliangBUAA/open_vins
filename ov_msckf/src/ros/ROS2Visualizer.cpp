@@ -40,6 +40,7 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
 
   // Setup our transform broadcaster
   mTfBr = std::make_shared<tf2_ros::TransformBroadcaster>(node);
+  mStaticTfBr = std::make_shared<tf2_ros::StaticTransformBroadcaster>(node);
 
   // Create image transport
   image_transport::ImageTransport it(node);
@@ -893,6 +894,7 @@ void ROS2Visualizer::publish_groundtruth() {
     R_gt2est = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
     t_gt2est = p_est - R_gt2est * state_gt.block(5, 0, 3, 1);
     gt_aligned = true;
+
     geometry_msgs::msg::TransformStamped trans;
     trans.header.stamp = _node->now();
     trans.header.frame_id = "drone0/odom";
@@ -909,7 +911,8 @@ void ROS2Visualizer::publish_groundtruth() {
     trans.transform.translation.y = t_inv(1);
     trans.transform.translation.z = t_inv(2);
     
-    mTfBr->sendTransform(trans);
+    mStaticTfBr->sendTransform(trans);
+    
     PRINT_INFO(GREEN "[GT-ALIGN] yaw %.1f deg (one-time)\n" RESET, yaw * 180.0 / M_PI);
   }
 
