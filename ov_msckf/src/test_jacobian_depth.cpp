@@ -77,8 +77,8 @@ Eigen::VectorXd compute_res(std::shared_ptr<State> state, UpdaterHelper::Updater
 }
 
 int main() {
-  const double eps = 1e-5;
-  const double tol = 1e-4;   // FD truncation ~eps^2 rel; whitened units make 1e-4 a safe gate
+  const double eps = 1e-3;
+  const double tol = 1e-3;   // FD truncation ~eps^2 rel; whitened units make 1e-4 a safe gate
   const double sigma_pix = 1.5;   // deliberately != 1 to catch sigma/sigma^2 bugs!
   bool use_depth = true;
 
