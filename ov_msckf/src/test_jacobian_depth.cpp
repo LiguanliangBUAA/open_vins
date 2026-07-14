@@ -9,6 +9,9 @@
 #include "types/PoseJPL.h"
 #include "utils/quat_ops.h"
 
+#include "cam/CamRadtan.h"
+#include "types/Vec.h"
+
 using namespace ov_core;
 using namespace ov_type;
 using namespace ov_msckf;
