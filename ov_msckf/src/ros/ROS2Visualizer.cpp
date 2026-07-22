@@ -186,13 +186,13 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
         [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
           Eigen::Matrix<double, 17, 1> gt = Eigen::Matrix<double, 17, 1>::Zero();
           gt(0) = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
-          gt(1) = msg->pose.position.x;
-          gt(2) = msg->pose.position.y;
-          gt(3) = msg->pose.position.z;
+          gt(1) = msg->pose.orientation.x;
+          gt(2) = msg->pose.orientation.y;
+          gt(3) = msg->pose.orientation.z;
           gt(4) = msg->pose.orientation.w;
-          gt(5) = msg->pose.orientation.x;
-          gt(6) = msg->pose.orientation.y;
-          gt(7) = msg->pose.orientation.z;
+          gt(5) = msg->pose.position.x;
+          gt(6) = msg->pose.position.y;
+          gt(7) = msg->pose.position.z;
           std::lock_guard<std::mutex> lck(gt_mtx);
           gt_states[gt(0)] = gt;
         });
@@ -900,7 +900,7 @@ void ROS2Visualizer::publish_groundtruth() {
     trans.header.frame_id = "drone0/odom";
     trans.child_frame_id = "drone0/ov_odom";
     
-    Eigen::Vector4d q_align = ov_core::rot_2_quat(R_gt2est.transpose());
+    Eigen::Vector4d q_align = ov_core::rot_2_quat(R_gt2est);
     Eigen::Vector3d t_inv = -R_gt2est.transpose() * t_gt2est;
     
     trans.transform.rotation.x = q_align(1);
@@ -912,7 +912,7 @@ void ROS2Visualizer::publish_groundtruth() {
     trans.transform.translation.z = t_inv(2);
     
     mStaticTfBr->sendTransform(trans);
-    
+
     PRINT_INFO(GREEN "[GT-ALIGN] yaw %.1f deg (one-time)\n" RESET, yaw * 180.0 / M_PI);
   }
 
