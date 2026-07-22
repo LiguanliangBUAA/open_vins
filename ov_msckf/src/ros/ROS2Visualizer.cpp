@@ -903,10 +903,10 @@ void ROS2Visualizer::publish_groundtruth() {
     Eigen::Vector4d q_align = ov_core::rot_2_quat(R_gt2est);
     Eigen::Vector3d t_inv = -R_gt2est.transpose() * t_gt2est;
     
-    trans.transform.rotation.x = q_align(1);
-    trans.transform.rotation.y = q_align(2);
-    trans.transform.rotation.z = q_align(3);
-    trans.transform.rotation.w = q_align(0);
+    trans.transform.rotation.x = q_align(0);
+    trans.transform.rotation.y = q_align(1);
+    trans.transform.rotation.z = q_align(2);
+    trans.transform.rotation.w = q_align(3);
     trans.transform.translation.x = t_inv(0);
     trans.transform.translation.y = t_inv(1);
     trans.transform.translation.z = t_inv(2);
