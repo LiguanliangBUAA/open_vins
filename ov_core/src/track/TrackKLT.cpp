@@ -29,7 +29,7 @@
 #include "utils/opencv_lambda_body.h"
 #include "utils/print.h"
 
-// # define DEPTH_VERIFT
+# define DEPTH_VERIFT
 
 using namespace ov_core;
 
