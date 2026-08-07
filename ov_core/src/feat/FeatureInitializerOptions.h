@@ -39,10 +39,10 @@ struct FeatureInitializerOptions {
   bool refine_features = true;
 
   /// If use depth init
-  bool use_depth_init = true;
+  bool use_depth_init = false;
 
   /// If anchor tiebreak
-  bool use_depth_anchor_tiebreak = true;
+  bool use_depth_anchor_tiebreak = false;
 
   /// Max runs for Levenberg-Marquardt
   int max_runs = 5;

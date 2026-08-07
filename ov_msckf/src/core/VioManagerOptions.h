@@ -473,9 +473,9 @@ struct VioManagerOptions {
       parser->parse_config("grid_x", grid_x);
       parser->parse_config("grid_y", grid_y);
       parser->parse_config("min_px_dist", min_px_dist);
-      parser->parse_config("use_depth_extraction", use_depth_extraction);
-      parser->parse_config("use_depth_init", featinit_options.use_depth_init, true);
-      parser->parse_config("use_depth_anchor_tiebreak", featinit_options.use_depth_anchor_tiebreak, true);
+      parser->parse_config("use_depth_extraction", use_depth_extraction, false);
+      parser->parse_config("use_depth_init", featinit_options.use_depth_init, false);
+      parser->parse_config("use_depth_anchor_tiebreak", featinit_options.use_depth_anchor_tiebreak, false);
       parser->parse_config("stereo_baseline", stereo_baseline, false);
       parser->parse_config("sigma_d", sigma_d, false);
       parser->parse_config("depth_z_min", depth_z_min, false);
