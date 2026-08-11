@@ -112,10 +112,12 @@ public:
    * @param[out] H_x Extra Jacobians in respect to the state (for example anchored pose)
    * @param[out] res Measurement residual for this feature
    * @param[out] x_order Extra variables our extra Jacobian has (for example anchored pose)
+   * @param[in] depth_outlier_sigma A depth observation more than this many std devs from the current
+   *            triangulated position is excluded from the update (its uv row is still used)
    */
   static void get_feature_jacobian_full(std::shared_ptr<State> state, UpdaterHelperFeature &feature, Eigen::MatrixXd &H_f,
                                         Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<ov_type::Type>> &x_order,
-                                        double sigma_pix, bool use_depth_residual);
+                                        double sigma_pix, bool use_depth_residual, double depth_outlier_sigma = 5.0);
 
   /**
    * @brief This will project the left nullspace of H_f onto the linear system.

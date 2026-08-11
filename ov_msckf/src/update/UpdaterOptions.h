@@ -43,10 +43,16 @@ struct UpdaterOptions {
   /// Whether we should use depth residuals or not (if available)
   bool use_depth_residual = true;
 
+  /// Number of depth std devs a single depth observation may disagree with the current triangulated
+  /// position before it is excluded from the update (its uv row is kept either way)
+  double depth_outlier_sigma = 5.0;
+
   /// Nice print function of what parameters we have loaded
   void print() {
     PRINT_DEBUG("    - chi2_multipler: %.1f\n", chi2_multipler);
     PRINT_DEBUG("    - sigma_pix: %.2f\n", sigma_pix);
+    PRINT_DEBUG("    - use_depth_residual?: %d\n", use_depth_residual);
+    PRINT_DEBUG("    - depth_outlier_sigma: %.2f\n", depth_outlier_sigma);
   }
 };
 

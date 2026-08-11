@@ -186,7 +186,8 @@ void UpdaterSLAM::delayed_init(std::shared_ptr<State> state, std::vector<std::sh
 
     // Get the Jacobian for this feature
     double sigma_pix = ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix : _options_slam.sigma_pix;
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, sigma_pix, _options_slam.use_depth_residual);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, sigma_pix, _options_slam.use_depth_residual,
+                                             _options_slam.depth_outlier_sigma);
 
     // If we are doing the single feature representation, then we need to remove the bearing portion
     // To do so, we project the bearing portion onto the state and depth Jacobians and the residual.
@@ -390,7 +391,8 @@ void UpdaterSLAM::update(std::shared_ptr<State> state, std::vector<std::shared_p
 
     // Get the Jacobian for this feature
     double current_sigma_pix = ((int)feat.featid < state->_options.max_aruco_features) ? _options_aruco.sigma_pix : _options_slam.sigma_pix;
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, current_sigma_pix, _options_slam.use_depth_residual);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, current_sigma_pix, _options_slam.use_depth_residual,
+                                             _options_slam.depth_outlier_sigma);
 
     // Place Jacobians in one big Jacobian, since the landmark is already in our state vector
     Eigen::MatrixXd H_xf = H_x;

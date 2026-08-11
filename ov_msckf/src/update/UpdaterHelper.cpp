@@ -191,7 +191,7 @@ void UpdaterHelper::get_feature_jacobian_representation(std::shared_ptr<State> s
 
 void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, UpdaterHelperFeature &feature, Eigen::MatrixXd &H_f,
                                               Eigen::MatrixXd &H_x, Eigen::VectorXd &res, std::vector<std::shared_ptr<Type>> &x_order,
-                                              double sigma_pix, bool use_depth_residual) {
+                                              double sigma_pix, bool use_depth_residual, double depth_outlier_sigma) {
 
   auto check_has_depth = [&](size_t cam_id, size_t m) -> bool {
     if (!use_depth_residual) return false;
@@ -199,6 +199,49 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
     if (feature.depth_vars.find(cam_id) == feature.depth_vars.end() || feature.depth_vars.at(cam_id).size() <= m) return false;
     return (feature.depths.at(cam_id).at(m) > 0.0f && feature.depth_vars.at(cam_id).at(m) > 0.0f);
   };
+
+  // Calculate the position of this feature in the global frame (needed early, below, for the depth
+  // outlier pre-check). If anchored, then we need to calculate the position of the feature in the global.
+  Eigen::Vector3d p_FinG = feature.p_FinG;
+  if (LandmarkRepresentation::is_relative_representation(feature.feat_representation)) {
+    assert(feature.anchor_cam_id != -1);
+    Eigen::Matrix3d R_ItoC_anchor = state->_calib_IMUtoCAM.at(feature.anchor_cam_id)->Rot();
+    Eigen::Vector3d p_IinC_anchor = state->_calib_IMUtoCAM.at(feature.anchor_cam_id)->pos();
+    Eigen::Matrix3d R_GtoI_anchor = state->_clones_IMU.at(feature.anchor_clone_timestamp)->Rot();
+    Eigen::Vector3d p_IinG_anchor = state->_clones_IMU.at(feature.anchor_clone_timestamp)->pos();
+    p_FinG = R_GtoI_anchor.transpose() * R_ItoC_anchor.transpose() * (feature.p_FinA - p_IinC_anchor) + p_IinG_anchor;
+  }
+
+  // Reject individual depth observations that grossly disagree with the current triangulated position.
+  // Without this, one bad/noisy depth sample gets baked into the stacked per-feature residual and can
+  // trip the whole-feature chi2 test downstream, discarding that feature's otherwise-good uv rows too.
+  // We only drop the offending depth sample here (feature.depths <= 0 means "no depth"); its uv
+  // measurement is untouched and still contributes a normal 2-row reprojection residual.
+  if (use_depth_residual) {
+    for (auto const &pair : feature.timestamps) {
+      if (feature.depths.find(pair.first) == feature.depths.end())
+        continue;
+      std::shared_ptr<PoseJPL> calibration = state->_calib_IMUtoCAM.at(pair.first);
+      Eigen::Matrix3d R_ItoC = calibration->Rot();
+      Eigen::Vector3d p_IinC = calibration->pos();
+      auto &depths_cam = feature.depths.at(pair.first);
+      for (size_t m = 0; m < pair.second.size() && m < depths_cam.size(); m++) {
+        if (depths_cam.at(m) <= 0.0f)
+          continue;
+        if (feature.depth_vars.find(pair.first) == feature.depth_vars.end() || feature.depth_vars.at(pair.first).size() <= m)
+          continue;
+        float z_var = feature.depth_vars.at(pair.first).at(m);
+        if (z_var <= 0.0f)
+          continue;
+        std::shared_ptr<PoseJPL> clone_Ii = state->_clones_IMU.at(pair.second.at(m));
+        Eigen::Vector3d p_FinIi = clone_Ii->Rot() * (p_FinG - clone_Ii->pos());
+        double z_pred = (R_ItoC * p_FinIi + p_IinC)(2);
+        if (std::abs((double)depths_cam.at(m) - z_pred) > depth_outlier_sigma * std::sqrt((double)z_var)) {
+          depths_cam.at(m) = -1.0f; // exclude just this depth sample, keep the uv row
+        }
+      }
+    }
+  }
 
   // Total number of measurements for this feature
   int total_hx = 0;
@@ -250,21 +293,8 @@ void UpdaterHelper::get_feature_jacobian_full(std::shared_ptr<State> state, Upda
     }
   }
   
-  // Calculate the position of this feature in the global frame
-  // If anchored, then we need to calculate the position of the feature in the global
-  Eigen::Vector3d p_FinG = feature.p_FinG;
-  if (LandmarkRepresentation::is_relative_representation(feature.feat_representation)) {
-    // Assert that we have an anchor pose for this feature
-    assert(feature.anchor_cam_id != -1);
-    // Get calibration for our anchor camera
-    Eigen::Matrix3d R_ItoC = state->_calib_IMUtoCAM.at(feature.anchor_cam_id)->Rot();
-    Eigen::Vector3d p_IinC = state->_calib_IMUtoCAM.at(feature.anchor_cam_id)->pos();
-    // Anchor pose orientation and position
-    Eigen::Matrix3d R_GtoI = state->_clones_IMU.at(feature.anchor_clone_timestamp)->Rot();
-    Eigen::Vector3d p_IinG = state->_clones_IMU.at(feature.anchor_clone_timestamp)->pos();
-    // Feature in the global frame
-    p_FinG = R_GtoI.transpose() * R_ItoC.transpose() * (feature.p_FinA - p_IinC) + p_IinG;
-  }
+  // Note: p_FinG was already computed above (before the row-count loop), since the depth
+  // outlier pre-check needs it too.
 
   // Calculate the position of this feature in the global frame FEJ
   // If anchored, then we can use the "best" p_FinG since the value of p_FinA does not matter

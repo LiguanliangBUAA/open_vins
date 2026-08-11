@@ -220,7 +220,8 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
     std::vector<std::shared_ptr<Type>> Hx_order;
 
     // Get the Jacobian for this feature
-    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, _options.sigma_pix, _options.use_depth_residual);
+    UpdaterHelper::get_feature_jacobian_full(state, feat, H_f, H_x, res, Hx_order, _options.sigma_pix, _options.use_depth_residual,
+                                             _options.depth_outlier_sigma);
 
     // Nullspace project
     UpdaterHelper::nullspace_project_inplace(H_f, H_x, res);
