@@ -138,6 +138,9 @@ protected:
   /// Publish current features
   void publish_features();
 
+  /// Access gt publish flag
+  bool get_live_gt_state(double query_time, Eigen::Matrix<double, 17, 1> &state_gt);
+
   /// Publish groundtruth (if we have it)
   void publish_groundtruth();
 
@@ -225,6 +228,7 @@ protected:
   bool publish_global2imu_tf = true;
   bool publish_calibration_tf = true;
   // Groundtruth alignment information
+  bool use_gt_topic = false;
   bool gt_aligned = false;
   int align_frame_count = 0;
   Eigen::Matrix3d R_gt2est = Eigen::Matrix3d::Identity();

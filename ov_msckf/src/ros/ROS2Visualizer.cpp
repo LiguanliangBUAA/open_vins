@@ -19,6 +19,7 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <algorithm>
 #include "ROS2Visualizer.h"
 
 #include "core/VioManager.h"
@@ -176,8 +177,8 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
   PRINT_INFO("subscribing to IMU: %s\n", topic_imu.c_str());
 
   // Load groundtruth from a live topic (Gazebo simulation)
-  bool use_gt_topic = false;
-  parser->parse_config("use_gt_topic", use_gt_topic, false);
+  // bool use_gt_topic = false;
+  parser->parse_config("use_gt_topic", this->use_gt_topic, false);
   if (use_gt_topic) {
     std::string topic_gt = "/drone0/ground_truth/pose";
     parser->parse_config("topic_gt", topic_gt, false);
@@ -186,13 +187,20 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
         [this](const geometry_msgs::msg::PoseStamped::SharedPtr msg) {
           Eigen::Matrix<double, 17, 1> gt = Eigen::Matrix<double, 17, 1>::Zero();
           gt(0) = msg->header.stamp.sec + msg->header.stamp.nanosec * 1e-9;
-          gt(1) = msg->pose.position.x;
-          gt(2) = msg->pose.position.y;
-          gt(3) = msg->pose.position.z;
+          // gt(1) = msg->pose.position.x;
+          // gt(2) = msg->pose.position.y;
+          // gt(3) = msg->pose.position.z;
+          // gt(4) = msg->pose.orientation.w;
+          // gt(5) = msg->pose.orientation.x;
+          // gt(6) = msg->pose.orientation.y;
+          // gt(7) = msg->pose.orientation.z;
+          gt(1) = msg->pose.orientation.x;
+          gt(2) = msg->pose.orientation.y;
+          gt(3) = msg->pose.orientation.z;
           gt(4) = msg->pose.orientation.w;
-          gt(5) = msg->pose.orientation.x;
-          gt(6) = msg->pose.orientation.y;
-          gt(7) = msg->pose.orientation.z;
+          gt(5) = msg->pose.position.x;
+          gt(6) = msg->pose.position.y;
+          gt(7) = msg->pose.position.z;
           std::lock_guard<std::mutex> lck(gt_mtx);
           gt_states[gt(0)] = gt;
         });
@@ -856,6 +864,88 @@ void ROS2Visualizer::publish_features() {
   pub_points_sim->publish(cloud_SIM);
 }
 
+bool ROS2Visualizer::get_live_gt_state(double query_time, Eigen::Matrix<double, 17, 1> &state_gt) {
+  std::lock_guard<std::mutex> lck(gt_mtx);
+  if (gt_states.empty()) {
+        return false;
+  }
+
+  // Case 1: query is newer than newest GT sample
+  auto it1 = gt_states.lower_bound(query_time);
+  if (it1 == gt_states.end()) {
+    auto it_last = std::prev(gt_states.end());
+    double dt = std::abs(query_time - it_last->first);
+    constexpr double max_time_error = 0.02; // 20 m
+    if (dt <= max_time_error) {
+      state_gt = it_last->second;
+      state_gt(0) = query_time;
+      return true;
+    }
+    
+    return false;
+  }
+
+  // Case 2: query is older than newest GT sample
+  if (it1 == gt_states.begin()) {
+    double dt = std::abs(query_time - it1->first);
+    constexpr double max_time_error = 0.02;
+
+    if (dt <= max_time_error) {
+      state_gt = it1->second;
+      state_gt(0) = query_time;
+      return true;
+    }
+
+    return false;
+  }
+
+  // Case 3: normal interpolation
+  auto it0 = std::prev(it1);
+  double t0 = it0->first;
+  double t1 = it1->first;
+  if (t1 <= t0) return false;
+
+  double alpha = (query_time - t0) / (t1 - t0);
+  alpha = std::clamp(alpha, 0.0, 1.0);
+
+  const auto &s0 = it0->second;
+  const auto &s1 = it1->second;
+
+  state_gt.setZero();
+  state_gt(0) = query_time;
+
+  state_gt.block<3, 1>(5, 0) = (1.0 - alpha) * s0.block<3, 1>(5, 0) + alpha * s1.block<3, 1>(5, 0);
+
+  // Quaternion interpolation
+  Eigen::Vector4d q0 = s0.block<4, 1>(1, 0);
+  Eigen::Vector4d q1 = s1.block<4, 1>(1, 0);
+
+  q0.normalize();
+  q1.normalize();
+
+  // Same quaternion hemisphere
+  if (q0.dot(q1) < 0.0) {
+    q1 = -q1;
+  }
+
+  double dot = std::clamp(q0.dot(q1), -1.0, 1.0);
+  Eigen::Vector4d q_interp;
+
+  // Nearly identical quaternion -> linear interpolation
+  if (dot > 0.9995) {
+    q_interp = ((1.0 - alpha) * q0 + alpha * q1).normalized();
+  } else {
+    double theta = std::acos(dot);
+    double sin_theta = std::sin(theta);
+    double w0 = std::sin((1.0 - alpha) * theta) / sin_theta;
+
+    double w1 = std::sin(alpha * theta) / sin_theta;
+    q_interp = (w0 * q0 + w1 * q1).normalized();}
+    state_gt.block<4, 1>(1, 0) =q_interp;
+
+    return true;
+}
+
 void ROS2Visualizer::publish_groundtruth() {
 
   // Our groundtruth state
@@ -867,8 +957,42 @@ void ROS2Visualizer::publish_groundtruth() {
 
   // Check that we have the timestamp in our GT file or topic
   if (_sim == nullptr) {
-    std::lock_guard<std::mutex> lck(gt_mtx);
-    if (gt_states.empty() || !DatasetReader::get_gt_state(timestamp_inI, state_gt, gt_states)) {
+    bool got_gt = false;
+    if (this->use_gt_topic){
+      // Live ROS2 GT Topic
+      got_gt = get_live_gt_state(timestamp_inI, state_gt);
+    } else {
+      // Offline GT file
+      std::lock_guard<std::mutex> lck(gt_mtx);
+      got_gt = !gt_states.empty() && DatasetReader::get_gt_state(timestamp_inI, state_gt, gt_states);
+    }
+
+    // Debug failed live GT lookup
+    if (!got_gt) {
+      static size_t gt_query_fail_count = 0;
+      gt_query_fail_count++;
+
+      if (this->use_gt_topic && gt_query_fail_count % 50 == 0){
+        double latest_gt = -1.0;
+        {
+          std::lock_guard<std::mutex> lck(gt_mtx);
+          if (!gt_states.empty()){
+            latest_gt = gt_states.rbegin()->first;
+          }
+        }
+        PRINT_INFO(YELLOW
+          "[GT-LIVE] query failed: "
+          "query=%.6f latest=%.6f "
+          "dt=%.6f count=%zu\n"
+          RESET,
+          timestamp_inI,
+          latest_gt,
+          (
+            latest_gt > 0.0 ? timestamp_inI - latest_gt : -1.0
+          ),
+          gt_query_fail_count
+        );
+      }
       return;
     }
   } else {
@@ -876,6 +1000,10 @@ void ROS2Visualizer::publish_groundtruth() {
     if (!_sim->get_state(timestamp_inI, state_gt))
       return;
   }
+
+  // Keep raw GT unchanged
+  Eigen::Matrix<double, 17, 1> state_gt_raw = state_gt;
+  Eigen::Matrix<double, 17, 1> state_gt_aligned = state_gt_raw;
 
   // Get the current system state estimate
   Eigen::Matrix<double, 16, 1> state_ekf = _app->get_state()->_imu->value();
@@ -887,12 +1015,12 @@ void ROS2Visualizer::publish_groundtruth() {
     align_frame_count++;
     if (align_frame_count < 10) return;
     Eigen::Matrix3d R_GtoI_est = ov_core::quat_2_Rot(q_est);
-    Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt.block(1, 0, 4, 1));
+    Eigen::Matrix3d R_GtoI_gt  = ov_core::quat_2_Rot(state_gt_aligned.block<4, 1>(1, 0));
     Eigen::Matrix3d R_full = R_GtoI_est.transpose() * R_GtoI_gt;
 
     double yaw = std::atan2(R_full(1, 0), R_full(0, 0));
     R_gt2est = Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitZ()).toRotationMatrix();
-    t_gt2est = p_est - R_gt2est * state_gt.block(5, 0, 3, 1);
+    t_gt2est = p_est - R_gt2est * state_gt_aligned.block<3, 1>(5, 0);
     gt_aligned = true;
 
     // ==== earth -> ov_odom | simulation only ====
@@ -917,29 +1045,51 @@ void ROS2Visualizer::publish_groundtruth() {
     PRINT_INFO(GREEN "[GT-ALIGN] yaw %.1f deg (one-time)\n" RESET, yaw * 180.0 / M_PI);
   }
 
-  state_gt.block(5, 0, 3, 1) = (R_gt2est * state_gt.block(5, 0, 3, 1)).eval() + t_gt2est;
-  Eigen::Matrix3d R_tmp = ov_core::quat_2_Rot(state_gt.block(1, 0, 4, 1));
-  state_gt.block(1, 0, 4, 1) = ov_core::rot_2_quat(R_tmp * R_gt2est.transpose());
-  // =========================================================================
+  // Convert raw earth GT -> ov_odom aligned GT
+  state_gt_aligned.block<3, 1>(5, 0) = (R_gt2est * state_gt_aligned.block<3, 1>(5, 0)).eval() + t_gt2est;
+  Eigen::Matrix3d R_tmp = ov_core::quat_2_Rot(state_gt_aligned.block<4, 1>(1, 0));
+  state_gt_aligned.block<4, 1>(1, 0) = ov_core::rot_2_quat(R_tmp * R_gt2est.transpose());
+
+  // Optional raw GT debug
+  static size_t gt_debug_count = 0;
+  gt_debug_count++;
+  if (gt_debug_count % 50 == 0) {
+      PRINT_INFO(
+          GREEN
+          "[GT-RAW] "
+          "t=%.3f "
+          "p=[%.3f %.3f %.3f] "
+          "q=[%.3f %.3f %.3f %.3f]\n"
+          RESET,
+          state_gt_raw(0),
+          state_gt_raw(5),
+          state_gt_raw(6),
+          state_gt_raw(7),
+          state_gt_raw(1),
+          state_gt_raw(2),
+          state_gt_raw(3),
+          state_gt_raw(4)
+      );
+  }
 
   // Create pose of IMU for visualization
   geometry_msgs::msg::PoseStamped poseIinM;
   poseIinM.header.stamp = ROSVisualizerHelper::get_time_from_seconds(timestamp_inI);
-  poseIinM.header.frame_id = "drone0/ov_odom";
-  poseIinM.pose.orientation.x = state_gt(1, 0);
-  poseIinM.pose.orientation.y = state_gt(2, 0);
-  poseIinM.pose.orientation.z = state_gt(3, 0);
-  poseIinM.pose.orientation.w = state_gt(4, 0);
-  poseIinM.pose.position.x = state_gt(5, 0);
-  poseIinM.pose.position.y = state_gt(6, 0);
-  poseIinM.pose.position.z = state_gt(7, 0);
+  poseIinM.header.frame_id = "earth";
+  poseIinM.pose.orientation.x = state_gt_raw(1);
+  poseIinM.pose.orientation.y = state_gt_raw(2);
+  poseIinM.pose.orientation.z = state_gt_raw(3);
+  poseIinM.pose.orientation.w = state_gt_raw(4);
+  poseIinM.pose.position.x = state_gt_raw(5);
+  poseIinM.pose.position.y = state_gt_raw(6);
+  poseIinM.pose.position.z = state_gt_raw(7);
   pub_posegt->publish(poseIinM);
 
   // Append to our pose vector and publish path
   poses_gt.push_back(poseIinM);
   nav_msgs::msg::Path arrIMU;
   arrIMU.header.stamp = _node->now();
-  arrIMU.header.frame_id = "drone0/ov_odom";
+  arrIMU.header.frame_id = "earth";
   for (size_t i = 0; i < poses_gt.size(); i += std::floor((double)poses_gt.size() / 16384.0) + 1) {
     arrIMU.poses.push_back(poses_gt.at(i));
   }
@@ -949,36 +1099,38 @@ void ROS2Visualizer::publish_groundtruth() {
   if (publish_global2imu_tf) {
     geometry_msgs::msg::TransformStamped trans;
     trans.header.stamp = _node->now();
-    trans.header.frame_id = "drone0/ov_odom";
+    trans.header.frame_id = "earth";
     trans.child_frame_id = "truth";
-    trans.transform.rotation.x = state_gt(1, 0);
-    trans.transform.rotation.y = state_gt(2, 0);
-    trans.transform.rotation.z = state_gt(3, 0);
-    trans.transform.rotation.w = state_gt(4, 0);
-    trans.transform.translation.x = state_gt(5, 0);
-    trans.transform.translation.y = state_gt(6, 0);
-    trans.transform.translation.z = state_gt(7, 0);
+    trans.transform.rotation.x = state_gt_raw(1);
+    trans.transform.rotation.y = state_gt_raw(2);
+    trans.transform.rotation.z = state_gt_raw(3);
+    trans.transform.rotation.w = state_gt_raw(4);
+    trans.transform.translation.x = state_gt_raw(5);
+    trans.transform.translation.y = state_gt_raw(6);
+    trans.transform.translation.z = state_gt_raw(7);
     mTfBr->sendTransform(trans);
   }
 
-  double dx = state_ekf(4, 0) - state_gt(5, 0);
-  double dy = state_ekf(5, 0) - state_gt(6, 0);
-  double dz = state_ekf(6, 0) - state_gt(7, 0);
+  double dx = state_ekf(4) - state_gt_aligned(5);
+  double dy = state_ekf(5) - state_gt_aligned(6);
+  double dz = state_ekf(6) - state_gt_aligned(7);
   double err_pos = std::sqrt(dx * dx + dy * dy + dz * dz);
 
   // Quaternion error
   Eigen::Matrix<double, 4, 1> quat_gt, quat_st, quat_diff;
-  quat_gt << state_gt(1, 0), state_gt(2, 0), state_gt(3, 0), state_gt(4, 0);
-  quat_st << state_ekf(0, 0), state_ekf(1, 0), state_ekf(2, 0), state_ekf(3, 0);
+  quat_gt << state_gt_aligned(1), state_gt_aligned(2), state_gt_aligned(3), state_gt_aligned(4);
+  quat_st << state_ekf(0), state_ekf(1), state_ekf(2), state_ekf(3);
   quat_diff = quat_multiply(quat_st, Inv(quat_gt));
-  double err_ori = (180.0 / M_PI) * 2.0 * quat_diff.block<3, 1>(0, 0).norm();
+  if (quat_diff.norm() > 1e-12) quat_diff.normalize();
+  double qv_norm = quat_diff.block<3, 1>(0, 0).norm();
+  double qw = std::abs(quat_diff(3));
+  double err_ori = (180.0 / M_PI) * 2.0 * std::atan2(qv_norm, qw);
 
   // Update our average variables
   summed_mse_ori += err_ori * err_ori;
   summed_mse_pos += err_pos * err_pos;
   summed_number++;
 
-  // Nice display for the user
   PRINT_INFO(REDPURPLE "error to gt => %.3f, %.3f (deg,m) | rmse => %.3f, %.3f (deg,m) | called %zu times\n" RESET, 
              err_ori, err_pos,
              std::sqrt(summed_mse_ori / summed_number), std::sqrt(summed_mse_pos / summed_number), summed_number);
