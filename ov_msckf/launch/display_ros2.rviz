@@ -3,14 +3,14 @@ Panels:
     Help Height: 0
     Name: Displays
     Property Tree Widget:
-      Expanded: ~
+      Expanded:
+        - /Global Options1
       Splitter Ratio: 0.4882352948188782
     Tree Height: 272
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
     Expanded:
-      - /2D Nav Goal1
       - /Publish Point1
     Name: Tool Properties
     Splitter Ratio: 0.5886790156364441
@@ -45,13 +45,43 @@ Visualization Manager:
       Frame Timeout: 120
       Frames:
         All Enabled: true
-        cam0:
+        camera_accel_frame:
           Value: true
-        global:
+        camera_accel_optical_frame:
           Value: true
-        imu:
+        camera_aligned_depth_to_infra1_frame:
           Value: true
-        truth:
+        camera_color_frame:
+          Value: true
+        camera_color_optical_frame:
+          Value: true
+        camera_depth_frame:
+          Value: true
+        camera_depth_optical_frame:
+          Value: true
+        camera_gyro_frame:
+          Value: true
+        camera_gyro_optical_frame:
+          Value: true
+        camera_imu_frame:
+          Value: true
+        camera_imu_optical_frame:
+          Value: true
+        camera_infra1_frame:
+          Value: true
+        camera_infra1_optical_frame:
+          Value: true
+        camera_infra2_frame:
+          Value: true
+        camera_infra2_optical_frame:
+          Value: true
+        camera_link:
+          Value: true
+        drone0/local_est/cam00:
+          Value: true
+        drone0/local_est/imu:
+          Value: true
+        drone0/ov_odom:
           Value: true
       Marker Scale: 1
       Name: TF
@@ -59,12 +89,10 @@ Visualization Manager:
       Show Axes: true
       Show Names: true
       Tree:
-        global:
-          imu:
-            cam0:
+        drone0/ov_odom:
+          drone0/local_est/imu:
+            drone0/local_est/cam00:
               {}
-          truth:
-            {}
       Update Interval: 0
       Value: true
     - Class: rviz_default_plugins/Image
@@ -74,9 +102,12 @@ Visualization Manager:
       Min Value: 0
       Name: Image Tracks
       Normalize Range: true
-      Queue Size: 10
-      Topic: /ov_msckf/trackhist
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/trackhist
       Value: true
     - Class: rviz_default_plugins/Image
       Enabled: false
@@ -85,9 +116,12 @@ Visualization Manager:
       Min Value: 0
       Name: Current Depths
       Normalize Range: true
-      Queue Size: 10
-      Topic: /ov_msckf/loop_depth_colored
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/loop_depth_colored
       Value: false
     - Alpha: 1
       Buffer Length: 1
@@ -109,8 +143,13 @@ Visualization Manager:
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
-      Topic: /ov_msckf/pathimu
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/pathimu
       Value: true
     - Alpha: 1
       Buffer Length: 1
@@ -132,8 +171,13 @@ Visualization Manager:
       Radius: 0.029999999329447746
       Shaft Diameter: 0.10000000149011612
       Shaft Length: 0.10000000149011612
-      Topic: /ov_msckf/pathgt
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/pathgt
       Value: true
     - Alpha: 0.800000011920929
       Autocompute Intensity Bounds: true
@@ -155,13 +199,17 @@ Visualization Manager:
       Min Intensity: 0
       Name: MSCKF Points
       Position Transformer: XYZ
-      Queue Size: 10
       Selectable: true
       Size (Pixels): 8
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /ov_msckf/points_msckf
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/points_msckf
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -185,13 +233,17 @@ Visualization Manager:
       Min Intensity: 0
       Name: SLAM Points
       Position Transformer: XYZ
-      Queue Size: 10
       Selectable: true
       Size (Pixels): 8
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /ov_msckf/points_slam
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/points_slam
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -215,13 +267,17 @@ Visualization Manager:
       Min Intensity: 0
       Name: ARUCO Points
       Position Transformer: XYZ
-      Queue Size: 10
       Selectable: true
       Size (Pixels): 15
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /ov_msckf/points_aruco
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/points_aruco
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -245,13 +301,17 @@ Visualization Manager:
       Min Intensity: 0
       Name: ACTIVE Points
       Position Transformer: XYZ
-      Queue Size: 10
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /ov_msckf/loop_feats
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/loop_feats
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
@@ -275,20 +335,24 @@ Visualization Manager:
       Min Intensity: 0
       Name: SIM Points
       Position Transformer: XYZ
-      Queue Size: 10
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.009999999776482582
       Style: Points
-      Topic: /ov_msckf/points_sim
-      Unreliable: false
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /ov_msckf/points_sim
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: global
+    Fixed Frame: drone0/ov_odom
     Frame Rate: 60
   Name: root
   Tools:
@@ -298,12 +362,30 @@ Visualization Manager:
     - Class: rviz_default_plugins/Measure
       Line color: 128; 128; 0
     - Class: rviz_default_plugins/SetInitialPose
-      Topic: /initialpose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /initialpose
     - Class: rviz_default_plugins/SetGoal
-      Topic: /move_base_simple/goal
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /move_base_simple/goal
     - Class: rviz_default_plugins/PublishPoint
       Single click: true
-      Topic: /clicked_point
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /clicked_point
   Transformation:
     Current:
       Class: rviz_default_plugins/TF
@@ -311,7 +393,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 10
+      Distance: 57.98884582519531
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -326,10 +408,10 @@ Visualization Manager:
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.9453980326652527
+      Pitch: 0.3603982627391815
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.7853981852531433
+      Yaw: 2.730403423309326
     Saved: ~
 Window Geometry:
   Current Depths:
@@ -349,5 +431,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 1291
-  X: 2051
+  X: 389
   Y: 110

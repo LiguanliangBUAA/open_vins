@@ -1,0 +1,85 @@
+%YAML:1.0
+
+# D435i cam0/cam1/cam3 + IMU: factory calibration read with `rs-enumerate-devices -c`
+# (D435I serial 833612070238, FW 5.17.0.10). librealsense extrinsic "A to B" maps
+# p_B = R p_A + t, which is Kalibr's T_cam_imu with A = Gyro/Accel, B = camera.
+# Factory IMU->depth rotation is identity (librealsense publishes IMU data in the
+# depth/infra1 axes). Infra rect streams and color have zero factory distortion.
+# timeshift is 0: no factory value; the driver runs with global_time_enabled.
+
+# Infra1 (Gyro -> Infrared 1)
+cam0:
+  T_cam_imu:
+    - [1.0, 0.0, 0.0, 0.00552000012248755]
+    - [0.0, 1.0, 0.0, -0.00510000018402934]
+    - [0.0, 0.0, 1.0, -0.011739999987185]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: [1, 3]
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  distortion_model: radtan
+  intrinsics: [389.3798828125, 389.3798828125, 317.051483154297, 233.265029907227]
+  resolution: [640, 480]
+  rostopic: /camera/camera/infra1/image_rect_raw
+  timeshift_cam_imu: 0.0
+
+# Infra2 (Gyro -> Infrared 2)
+cam1:
+  T_cam_imu:
+    - [1.0, 0.0, 0.0, -0.0443975403904915]
+    - [0.0, 1.0, 0.0, -0.00510000018402934]
+    - [0.0, 0.0, 1.0, -0.011739999987185]
+    - [0.0, 0.0, 0.0, 1.0]
+  # Infrared 1 -> Infrared 2
+  T_cn_cnm1:
+    - [1.0, 0.0, 0.0, -0.0499175414443016]
+    - [0.0, 1.0, 0.0, 0.0]
+    - [0.0, 0.0, 1.0, 0.0]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: [0, 3]
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  distortion_model: radtan
+  intrinsics: [389.3798828125, 389.3798828125, 317.051483154297, 233.265029907227]
+  resolution: [640, 480]
+  rostopic: /camera/camera/infra2/image_rect_raw
+  timeshift_cam_imu: 0.0
+
+# Arducam RGB
+cam2:
+  T_cam_imu:
+    - [-0.999837548444820,  0.010583681901847, -0.014589804565278,  0.018460724743872]
+    - [-0.017454785776131, -0.366665951781268,  0.930188911059385,  0.089028710885704]
+    - [ 0.004495238966048,  0.930292462337375,  0.366791122227489, -0.087473868089457]
+    - [ 0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: []
+  camera_model: pinhole
+  distortion_coeffs: [-0.2613097981791508, 0.0630743381024569, 5.8188260905609616e-05, -0.000462504941847639]
+  distortion_model: radtan
+  intrinsics: [565.1475484500812, 565.8665236669143, 599.0342547752033, 331.981704909417]
+  resolution: [1280, 720]
+  rostopic: /drone0/sensor_measurements/camera/image
+  timeshift_cam_imu: -0.06186811507114085
+
+# D435i RGB (Gyro -> Color). Rotation is printed to 6 digits by the SDK and
+# re-orthonormalised here (change < 4e-7).
+cam3:
+  T_cam_imu:
+    - [0.9999376026994631, -0.011165996830646218, -0.0003335002677786753, 0.0202956981956959]
+    - [0.011164597862835446, 0.9999299219420991, -0.003937379766799778, -0.00466640712693334]
+    - [0.000377441666724737, 0.003933410688554249, 0.999992192878596, -0.0114134615287185]
+    - [0.0, 0.0, 0.0, 1.0]
+  # Infrared 2 -> Color (relative to cam1, not to the Arducam cam2)
+  T_cn_cnm1:
+    - [0.9999376026994631, -0.011165996830646218, -0.0003335002677786753, 0.0646296069025993]
+    - [0.011164597862835446, 0.9999299219420991, -0.003937379766799778, 0.000882693100720644]
+    - [0.000377441666724737, 0.003933410688554249, 0.999992192878596, 0.000363265309715644]
+    - [0.0, 0.0, 0.0, 1.0]
+  cam_overlaps: [0, 1]
+  camera_model: pinhole
+  distortion_coeffs: [0.0, 0.0, 0.0, 0.0]
+  distortion_model: radtan
+  intrinsics: [924.41845703125, 924.395385742188, 642.007934570312, 360.258361816406]
+  resolution: [1280, 720]
+  rostopic: /camera/camera/color/image_raw
+  timeshift_cam_imu: 0.0
