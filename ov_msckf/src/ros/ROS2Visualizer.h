@@ -25,6 +25,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <image_transport/image_transport.h>
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -159,7 +160,12 @@ protected:
   // Our publishers
   image_transport::Publisher it_pub_tracks, it_pub_loop_img_depth, it_pub_loop_img_depth_color;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pub_poseimu;
-  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odomimu;
+  rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_odomimu, pub_odomimu_map, pub_odombody_map;
+  rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pub_nav_pose;
+  rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub_nav_twist;
+
+  /// ^I T_B (kalibr imu0.T_i_b), used to turn the map frame imu outputs into base_link outputs
+  Eigen::Matrix4d T_I_B = Eigen::Matrix4d::Identity();
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_pathimu;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_points_msckf, pub_points_slam, pub_points_aruco, pub_points_sim;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_loop_pose, pub_loop_extrinsic;

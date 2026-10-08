@@ -50,6 +50,7 @@ class StateHelper;
 class UpdaterMSCKF;
 class UpdaterSLAM;
 class UpdaterZeroVelocity;
+class UpdaterMapLandmark;
 class Propagator;
 
 /**
@@ -208,6 +209,9 @@ protected:
 
   /// Our zero velocity tracker
   std::shared_ptr<UpdaterZeroVelocity> updaterZUPT;
+
+  /// Our map landmark updater (owns T_MtoG), nullptr unless use_map_landmarks
+  std::shared_ptr<UpdaterMapLandmark> updaterLANDMARK;
 
   /// This is the queue of measurement times that have come in since we starting doing initialization
   /// After we initialize, we will want to prop & update to the latest timestamp quickly

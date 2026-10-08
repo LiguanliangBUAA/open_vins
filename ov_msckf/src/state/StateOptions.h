@@ -64,6 +64,9 @@ struct StateOptions {
   /// What model our IMU intrinsics are
   ImuModel imu_model = ImuModel::KALIBR;
 
+  /// Bool to determine whether or not to estimate the map-to-global transform T_MtoG and use map landmarks
+  bool use_map_landmarks = false;
+
   /// Max clone size of sliding window
   int max_clone_size = 11;
 
@@ -117,6 +120,7 @@ struct StateOptions {
       parser->parse_config("calib_cam_timeoffset", do_calib_camera_timeoffset);
       parser->parse_config("calib_imu_intrinsics", do_calib_imu_intrinsics);
       parser->parse_config("calib_imu_g_sensitivity", do_calib_imu_g_sensitivity);
+      parser->parse_config("use_map_landmarks", use_map_landmarks, false);
 
       // State parameters
       parser->parse_config("max_clones", max_clone_size);
@@ -162,6 +166,7 @@ struct StateOptions {
     PRINT_DEBUG("  - calib_cam_timeoffset: %d\n", do_calib_camera_timeoffset);
     PRINT_DEBUG("  - calib_imu_intrinsics: %d\n", do_calib_imu_intrinsics);
     PRINT_DEBUG("  - calib_imu_g_sensitivity: %d\n", do_calib_imu_g_sensitivity);
+    PRINT_DEBUG("  - use_map_landmarks: %d\n", use_map_landmarks);
     PRINT_DEBUG("  - imu_model: %d\n", imu_model);
     PRINT_DEBUG("  - max_clones: %d\n", max_clone_size);
     PRINT_DEBUG("  - max_slam: %d\n", max_slam_features);

@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "state/StateOptions.h"
+#include "update/UpdaterMapLandmarkOptions.h"
 #include "update/UpdaterOptions.h"
 #include "utils/NoiseManager.h"
 
@@ -63,6 +64,9 @@ struct VioManagerOptions {
     print_and_load_estimator(parser);
     print_and_load_trackers(parser);
     print_and_load_noise(parser);
+    if (state_options.use_map_landmarks) {
+      map_landmark_options.print(parser);
+    }
 
     // needs to be called last
     print_and_load_state(parser);
@@ -146,6 +150,9 @@ struct VioManagerOptions {
 
   /// Update options for zero velocity (chi2 multiplier)
   UpdaterOptions zupt_options;
+
+  /// T_MtoG prior / random walk and map landmark update options (only with use_map_landmarks)
+  UpdaterMapLandmarkOptions map_landmark_options;
 
   /**
    * @brief This function will load print out all noise parameters loaded.

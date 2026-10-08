@@ -51,6 +51,20 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   PRINT_DEBUG("Publishing: %s\n", pub_poseimu->get_topic_name());
   pub_odomimu = node->create_publisher<nav_msgs::msg::Odometry>("odomimu", 2);
   PRINT_DEBUG("Publishing: %s\n", pub_odomimu->get_topic_name());
+  pub_odomimu_map = node->create_publisher<nav_msgs::msg::Odometry>("odomimu_map", 2);
+  PRINT_DEBUG("Publishing: %s\n", pub_odomimu_map->get_topic_name());
+  pub_odombody_map = node->create_publisher<nav_msgs::msg::Odometry>("odombody_map", 2);
+  PRINT_DEBUG("Publishing: %s\n", pub_odombody_map->get_topic_name());
+  const UpdaterMapLandmarkOptions map_options = _app->get_params().map_landmark_options;
+  T_I_B = map_options.T_I_B;
+  if (!map_options.nav_pose_topic.empty()) {
+    pub_nav_pose = node->create_publisher<geometry_msgs::msg::PoseStamped>(map_options.nav_pose_topic, 2);
+    PRINT_DEBUG("Publishing: %s\n", pub_nav_pose->get_topic_name());
+  }
+  if (!map_options.nav_twist_topic.empty()) {
+    pub_nav_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>(map_options.nav_twist_topic, 2);
+    PRINT_DEBUG("Publishing: %s\n", pub_nav_twist->get_topic_name());
+  }
   pub_pathimu = node->create_publisher<nav_msgs::msg::Path>("pathimu", 2);
   PRINT_DEBUG("Publishing: %s\n", pub_pathimu->get_topic_name());
 
@@ -360,6 +374,9 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
   if (!_app->get_propagator()->fast_state_propagate(state, timestamp, state_plus, cov_plus))
     return;
 
+  // Unreordered copy ([dtheta, dp, v, w]), the odomimu block below permutes cov_plus in place
+  const Eigen::Matrix<double, 12, 12> cov_plus_jpl = cov_plus;
+
   // Publish our odometry message if requested
   if (pub_odomimu->get_subscription_count() != 0) {
 
@@ -403,6 +420,186 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
       }
     }
     pub_odomimu->publish(odomIinM);
+  }
+
+  // Map frame outputs, once T_MtoG (q_MtoG, p_GinM) is in the state
+  std::shared_ptr<ov_type::PoseJPL> T_MtoG = state->_T_MtoG;
+  if (T_MtoG != nullptr) {
+
+    // earth -> ov_odom is ^M T_G, which is exactly the PoseJPL (q_MtoG, p_GinM)
+    geometry_msgs::msg::TransformStamped trans_map = ROSVisualizerHelper::get_stamped_transform_from_pose(_node, T_MtoG, false);
+    trans_map.header.stamp = _node->now();
+    trans_map.header.frame_id = "earth";
+    trans_map.child_frame_id = "drone0/ov_odom";
+    mTfBr->sendTransform(trans_map);
+
+    if (pub_odomimu_map->get_subscription_count() != 0) {
+
+      // R_MtoI = R_GtoI * R_MtoG, p_IinM = p_GinM + R_MtoG^T * p_IinG
+      Eigen::Vector4d q_GtoI = state_plus.block(0, 0, 4, 1);
+      Eigen::Vector3d p_IinG = state_plus.block(4, 0, 3, 1);
+      Eigen::Matrix3d R_MtoG = T_MtoG->Rot();
+      Eigen::Vector4d q_MtoI = ov_core::quat_multiply(q_GtoI, T_MtoG->quat());
+      Eigen::Vector3d p_IinM = T_MtoG->pos() + R_MtoG.transpose() * p_IinG;
+
+      // Covariance of [imu pose, T_MtoG], with the imu pose block replaced by the fast propagated one
+      // NOTE: the imu / T_MtoG cross term is taken at the last update time
+      std::vector<std::shared_ptr<ov_type::Type>> order = {state->_imu->pose(), T_MtoG};
+      Eigen::MatrixXd P = StateHelper::get_marginal_covariance(state, order);
+      P.block(0, 0, 6, 6) = cov_plus_jpl.block(0, 0, 6, 6);
+
+      // [dtheta_MtoI, dp_IinM] w.r.t. [dtheta_GtoI, dp_IinG, dtheta_MtoG, dp_GinM] (JPL left errors)
+      Eigen::Matrix<double, 6, 12> J = Eigen::Matrix<double, 6, 12>::Zero();
+      J.block(0, 0, 3, 3).setIdentity();
+      J.block(0, 6, 3, 3) = ov_core::quat_2_Rot(q_GtoI);
+      J.block(3, 3, 3, 3) = R_MtoG.transpose();
+      J.block(3, 6, 3, 3) = -R_MtoG.transpose() * ov_core::skew_x(p_IinG);
+      J.block(3, 9, 3, 3).setIdentity();
+      Eigen::Matrix<double, 6, 6> cov_pose = J * P * J.transpose();
+
+      nav_msgs::msg::Odometry odomIinMap;
+      odomIinMap.header.stamp = ROSVisualizerHelper::get_time_from_seconds(timestamp);
+      odomIinMap.header.frame_id = "earth";
+      odomIinMap.child_frame_id = "drone0/local_est/imu";
+      odomIinMap.pose.pose.orientation.x = q_MtoI(0);
+      odomIinMap.pose.pose.orientation.y = q_MtoI(1);
+      odomIinMap.pose.pose.orientation.z = q_MtoI(2);
+      odomIinMap.pose.pose.orientation.w = q_MtoI(3);
+      odomIinMap.pose.pose.position.x = p_IinM(0);
+      odomIinMap.pose.pose.position.y = p_IinM(1);
+      odomIinMap.pose.pose.position.z = p_IinM(2);
+
+      // The twist is in the imu frame, so it does not depend on T_MtoG
+      odomIinMap.twist.twist.linear.x = state_plus(7);
+      odomIinMap.twist.twist.linear.y = state_plus(8);
+      odomIinMap.twist.twist.linear.z = state_plus(9);
+      odomIinMap.twist.twist.angular.x = state_plus(10);
+      odomIinMap.twist.twist.angular.y = state_plus(11);
+      odomIinMap.twist.twist.angular.z = state_plus(12);
+
+      // ROS convention: position then orientation
+      Eigen::Matrix<double, 6, 6> Phi_ros = Eigen::Matrix<double, 6, 6>::Zero();
+      Phi_ros.block(0, 3, 3, 3).setIdentity();
+      Phi_ros.block(3, 0, 3, 3).setIdentity();
+      cov_pose = Phi_ros * cov_pose * Phi_ros.transpose();
+      for (int r = 0; r < 6; r++) {
+        for (int c = 0; c < 6; c++) {
+          odomIinMap.pose.covariance[6 * r + c] = cov_pose(r, c);
+          odomIinMap.twist.covariance[6 * r + c] = cov_plus_jpl(r + 6, c + 6);
+        }
+      }
+      pub_odomimu_map->publish(odomIinMap);
+    }
+
+    // base_link in the map frame, same semantics as map_alignment_ekf navigation_pose / navigation_twist:
+    // pose ^M T_B, linear velocity of base_link expressed in M, angular velocity expressed in B
+    if (pub_odombody_map->get_subscription_count() != 0 || pub_nav_pose != nullptr || pub_nav_twist != nullptr) {
+
+      Eigen::Matrix3d R_GtoI = ov_core::quat_2_Rot(state_plus.block(0, 0, 4, 1));
+      Eigen::Vector3d p_IinG = state_plus.block(4, 0, 3, 1);
+      Eigen::Vector3d v_I = state_plus.block(7, 0, 3, 1);
+      Eigen::Vector3d w_I = state_plus.block(10, 0, 3, 1);
+      Eigen::Matrix3d R_MtoG = T_MtoG->Rot();
+      Eigen::Matrix3d R_MtoI = R_GtoI * R_MtoG;
+      Eigen::Matrix3d R_ItoB = T_I_B.block<3, 3>(0, 0).transpose();
+      Eigen::Vector3d p_BinI = T_I_B.block<3, 1>(0, 3);
+      Eigen::Vector3d v_G = R_GtoI.transpose() * v_I;
+      Eigen::Vector3d w_x_r = w_I.cross(p_BinI);
+
+      Eigen::Matrix3d R_MtoB = R_ItoB * R_MtoI;
+      Eigen::Vector3d p_BinM = T_MtoG->pos() + R_MtoG.transpose() * p_IinG + R_MtoI.transpose() * p_BinI;
+      Eigen::Vector3d v_BinM = R_MtoI.transpose() * (v_I + w_x_r);
+      Eigen::Vector3d w_B = R_ItoB * w_I;
+
+      // Covariance of x = [dtheta_GtoI, dp_IinG, dv_I, dw_I, dtheta_MtoG, dp_GinM]
+      // The first 12 come from the fast propagation (v_I = R_GtoI * v_G with R_GtoI frozen, as in Propagator)
+      // NOTE: the cross terms with T_MtoG are taken at the last update time
+      std::vector<std::shared_ptr<ov_type::Type>> order = {state->_imu->pose(), state->_imu->v(), T_MtoG};
+      Eigen::MatrixXd P_state = StateHelper::get_marginal_covariance(state, order);
+      Eigen::Matrix<double, 18, 18> P = Eigen::Matrix<double, 18, 18>::Zero();
+      P.block(0, 0, 12, 12) = cov_plus_jpl;
+      P.block(12, 12, 6, 6) = P_state.block(9, 9, 6, 6);
+      P.block(0, 12, 6, 6) = P_state.block(0, 9, 6, 6);
+      P.block(6, 12, 3, 6) = R_GtoI * P_state.block(6, 9, 3, 6);
+      P.block(12, 0, 6, 12) = P.block(0, 12, 12, 6).transpose();
+
+      // y = [dtheta_MtoB, dp_BinM, dv_BinM, dw_B] (orientation as JPL left error, like odomimu)
+      Eigen::Matrix<double, 3, 18> A = Eigen::Matrix<double, 3, 18>::Zero(); // dtheta_MtoI
+      A.block(0, 0, 3, 3).setIdentity();
+      A.block(0, 12, 3, 3) = R_GtoI;
+      Eigen::Matrix<double, 12, 18> J = Eigen::Matrix<double, 12, 18>::Zero();
+      J.block(0, 0, 3, 18) = R_ItoB * A;
+      J.block(3, 3, 3, 3) = R_MtoG.transpose();
+      J.block(3, 12, 3, 3) = -R_MtoG.transpose() * ov_core::skew_x(p_IinG);
+      J.block(3, 15, 3, 3).setIdentity();
+      J.block(3, 0, 3, 18) += -R_MtoI.transpose() * ov_core::skew_x(p_BinI) * A;
+      J.block(6, 6, 3, 3) = R_MtoI.transpose();
+      J.block(6, 9, 3, 3) = -R_MtoI.transpose() * ov_core::skew_x(p_BinI);
+      J.block(6, 12, 3, 3) = -R_MtoG.transpose() * ov_core::skew_x(v_G);
+      J.block(6, 0, 3, 18) += -R_MtoI.transpose() * ov_core::skew_x(w_x_r) * A;
+      J.block(9, 9, 3, 3) = R_ItoB;
+      Eigen::Matrix<double, 12, 12> cov_y = J * P * J.transpose();
+
+      // NOTE: JPL q_MtoB has the same xyzw as the Hamilton orientation of B in M
+      Eigen::Vector4d q_MtoB = ov_core::rot_2_quat(R_MtoB);
+      auto stamp = ROSVisualizerHelper::get_time_from_seconds(timestamp);
+
+      geometry_msgs::msg::Pose pose_B;
+      pose_B.orientation.x = q_MtoB(0);
+      pose_B.orientation.y = q_MtoB(1);
+      pose_B.orientation.z = q_MtoB(2);
+      pose_B.orientation.w = q_MtoB(3);
+      pose_B.position.x = p_BinM(0);
+      pose_B.position.y = p_BinM(1);
+      pose_B.position.z = p_BinM(2);
+
+      geometry_msgs::msg::Twist twist_B;
+      twist_B.linear.x = v_BinM(0);
+      twist_B.linear.y = v_BinM(1);
+      twist_B.linear.z = v_BinM(2);
+      twist_B.angular.x = w_B(0);
+      twist_B.angular.y = w_B(1);
+      twist_B.angular.z = w_B(2);
+
+      if (pub_odombody_map->get_subscription_count() != 0) {
+        // NOTE: twist.linear is in the map frame (not child_frame_id), matching navigation_twist
+        nav_msgs::msg::Odometry odomBinMap;
+        odomBinMap.header.stamp = stamp;
+        odomBinMap.header.frame_id = "earth";
+        odomBinMap.child_frame_id = "base_link";
+        odomBinMap.pose.pose = pose_B;
+        odomBinMap.twist.twist = twist_B;
+
+        // ROS convention: position then orientation
+        Eigen::Matrix<double, 6, 6> Phi_ros = Eigen::Matrix<double, 6, 6>::Zero();
+        Phi_ros.block(0, 3, 3, 3).setIdentity();
+        Phi_ros.block(3, 0, 3, 3).setIdentity();
+        Eigen::Matrix<double, 6, 6> cov_pose_B = Phi_ros * cov_y.block(0, 0, 6, 6) * Phi_ros.transpose();
+        for (int r = 0; r < 6; r++) {
+          for (int c = 0; c < 6; c++) {
+            odomBinMap.pose.covariance[6 * r + c] = cov_pose_B(r, c);
+            odomBinMap.twist.covariance[6 * r + c] = cov_y(r + 6, c + 6);
+          }
+        }
+        pub_odombody_map->publish(odomBinMap);
+      }
+
+      if (pub_nav_pose != nullptr) {
+        geometry_msgs::msg::PoseStamped msg;
+        msg.header.stamp = stamp;
+        msg.header.frame_id = "earth";
+        msg.pose = pose_B;
+        pub_nav_pose->publish(msg);
+      }
+
+      if (pub_nav_twist != nullptr) {
+        geometry_msgs::msg::TwistStamped msg;
+        msg.header.stamp = stamp;
+        msg.header.frame_id = "earth";
+        msg.twist = twist_B;
+        pub_nav_twist->publish(msg);
+      }
+    }
   }
 
   // Publish our transform on TF

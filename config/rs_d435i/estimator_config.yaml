@@ -138,3 +138,33 @@ topic_depth: "/camera/camera/depth/image_rect_raw"
 use_gt_topic: false
 topic_gt: "/drone0/self_localization/pose"
 
+
+# ==================================================================
+# ==================================================================
+
+# --- Map landmarks: T_MtoG (map M -> OpenVINS global G) kept in the state ---
+# Stored as (q_MtoG, p_GinM); published as TF earth -> drone0/ov_odom and on odomimu_map.
+use_map_landmarks: true
+
+# Pose of base_link in the map when VIO initializes (the takeoff pad), row-major 4x4.
+# Converted with imu0.T_i_b from relative_config_imu: ^M T_G = ^M T_B * (^I T_B)^-1 * (^G T_I)^-1
+map_initial_T_M_B: [ 1.0, 0.0, 0.0, 0.0,
+                     0.0, 1.0, 0.0, 0.0,
+                     0.0, 0.0, 1.0, 0.0,
+                     0.0, 0.0, 0.0, 1.0 ]
+
+# Initial std of T_MtoG. Roll/pitch kept tight: both M and G are gravity aligned.
+map_sigma0_rp_deg: 2.0
+map_sigma0_yaw_deg: 5.0
+map_sigma0_pos_m: 1.0
+
+# Random walk of T_MtoG between images
+map_rw_rp_deg_sqrt_s: 0.01
+map_rw_yaw_deg_sqrt_s: 0.05
+map_rw_pos_m_sqrt_s: 0.03
+
+# Optional base_link outputs in the map frame (empty = off). Same semantics as map_alignment_ekf:
+# pose ^M T_B; twist linear = base_link velocity in M, angular = body rate in base_link.
+# Setting these to /drone0/localization/map_aligned/pose|twist replaces the Python node's outputs.
+map_nav_pose_topic: ""
+map_nav_twist_topic: ""

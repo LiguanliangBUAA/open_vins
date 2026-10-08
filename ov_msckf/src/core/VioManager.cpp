@@ -40,6 +40,7 @@
 #include "state/State.h"
 #include "state/StateHelper.h"
 #include "update/UpdaterMSCKF.h"
+#include "update/UpdaterMapLandmark.h"
 #include "update/UpdaterSLAM.h"
 #include "update/UpdaterZeroVelocity.h"
 
@@ -170,6 +171,11 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
     updaterZUPT = std::make_shared<UpdaterZeroVelocity>(params.zupt_options, params.imu_noises, trackFEATS->get_feature_database(),
                                                         propagator, params.gravity_mag, params.zupt_max_velocity,
                                                         params.zupt_noise_multiplier, params.zupt_max_disparity);
+  }
+
+  // If we are estimating T_MtoG, then create the map landmark updater
+  if (state->_options.use_map_landmarks) {
+    updaterLANDMARK = std::make_shared<UpdaterMapLandmark>(params.map_landmark_options, std::map<int, MapLandmark>());
   }
 }
 
@@ -591,6 +597,14 @@ void VioManager::do_feature_propagate_update(const ov_core::CameraData &message)
   for (auto const &feat : featsup_MSCKF) {
     good_features_MSCKF.push_back(feat->p_FinG);
     feat->to_delete = true;
+  }
+
+  //===================================================================================
+  // Map landmarks: T_MtoG init / random walk (before the oldest clone is marginalized)
+  //===================================================================================
+
+  if (updaterLANDMARK != nullptr) {
+    updaterLANDMARK->update(state);
   }
 
   //===================================================================================
