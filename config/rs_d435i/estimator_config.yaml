@@ -146,6 +146,10 @@ topic_gt: "/drone0/self_localization/pose"
 # Stored as (q_MtoG, p_GinM); published as TF earth -> drone0/ov_odom and on odomimu_map.
 use_map_landmarks: true
 
+# Known landmark points (id, xyz in the map frame). "" = ov_landmark's config/landmarks.yaml;
+# a relative path is relative to this file's folder.
+map_landmarks_yaml: ""
+
 # Pose of base_link in the map when VIO initializes (the takeoff pad), row-major 4x4.
 # Converted with imu0.T_i_b from relative_config_imu: ^M T_G = ^M T_B * (^I T_B)^-1 * (^G T_I)^-1
 map_initial_T_M_B: [ 1.0, 0.0, 0.0, 0.0,

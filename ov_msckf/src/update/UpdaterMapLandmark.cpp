@@ -7,12 +7,33 @@
 #include "utils/print.h"
 #include "utils/quat_ops.h"
 
+#include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <stdexcept>
+
 using namespace ov_core;
 using namespace ov_type;
 using namespace ov_msckf;
 
-UpdaterMapLandmark::UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, std::map<int, MapLandmark> landmark_map)
-    : _opts(std::move(opts)), _map(std::move(landmark_map)) {}
+UpdaterMapLandmark::UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, LandmarkMap landmark_map)
+    : _opts(std::move(opts)), _map(std::move(landmark_map)) {
+        if (_map.empty()) {
+            throw std::invalid_argument("landmark map is empty");
+        }
+
+        LandmarkId min_id = std::numeric_limits<LandmarkId>::max();
+        LandmarkId max_id = std::numeric_limits<LandmarkId>::lowest();
+
+        for (const auto &entry : _map) {
+            min_id = std::min(min_id, entry.first);
+            max_id = std::max(max_id, entry.first);
+        }
+
+        PRINT_INFO(GREEN "[MAP]: loaded %zu landmarks from %s, id range [%u, %u]\n" 
+            RESET, _map.size(), _opts.map_landmarks_yaml.c_str(), 
+            static_cast<unsigned int>(min_id), static_cast<unsigned int>(max_id));
+    }
 
 void UpdaterMapLandmark::feed_observations(const std::vector<LandmarkObservation> &obs) {
     std::lock_guard<std::mutex> lck(_pending_mtx);

@@ -1,0 +1,143 @@
+# IMAV 2026 arena landmark points, in the `earth` frame.
+#
+# Consumed by imav2026_perception/landmark_projector.py, which projects every point
+# into each configured camera and publishes the visible ones as
+# imav2026_msgs/KeypointObservationArray on perception/keypoints/<camera>.
+#
+# ---------------------------------------------------------------------------
+# KEEP IN SYNC BY HAND with launchers/common/gz_models/worlds/imav2026_indoor.sdf
+# and the per-model SDFs it includes. Every coordinate below is derived from
+# them; the derivation is shown in the comment above each group so a change in
+# the world can be traced to the numbers here.
+# ---------------------------------------------------------------------------
+#
+# ID blocks (globally unique, stable across runs):
+#   1000-1999  aruco corner              1000 + marker_id * 4 + corner_idx
+#   2000-2999  gate opening corner       2000 + opening_idx * 4 + corner_idx
+#   3000-3999  horizontal tube endpoint  3000 + tube_idx * 2 + end_idx
+#   4000-4999  vertical tube endpoint    4000 + tube_idx * 2 + end_idx
+#
+# Fields per point:
+#   id      globally unique uint32
+#   name    human-readable, shown in the debug overlay and RViz text markers
+#   xyz     position in the earth frame, metres
+#   normal  (optional) outward surface normal, earth frame. When present the
+#           projector applies a facing test: the point is only reported if the
+#           normal points back towards the camera. Used for planar markers and
+#           gate openings; omitted for tube endpoints, which are visible from
+#           any direction.
+#   object  (optional) the physical object the point belongs to, e.g. gate1_blue.
+#           Groups the points the landmark detector reports together (4 gate
+#           corners, 2 bar ends). Required whenever `type` is set.
+#   type    (optional) the landmark detector class that object is detected as:
+#           gate_blue | gate_red | bar_red | bar_blue. Points without a type are
+#           never published from the detector (ArUco has its own detector; the
+#           pipes are out of scope). The loader checks each typed object has the
+#           type's point count and that the type matches the id's class block.
+
+landmarks:
+  
+  # ARUCO CORNERS  (class 0, ids 1000-1999)
+
+  # Marker id 0, centre (-2, 2).
+  - {id: 1000, name: aruco0/c0_NE, xyz: [-1.805, 2.195, 0.0], normal: [0, 0, 1]}
+  - {id: 1001, name: aruco0/c1_SE, xyz: [-1.805, 1.805, 0.0], normal: [0, 0, 1]}
+  - {id: 1002, name: aruco0/c2_SW, xyz: [-2.195, 1.805, 0.0], normal: [0, 0, 1]}
+  - {id: 1003, name: aruco0/c3_NW, xyz: [-2.195, 2.195, 0.0], normal: [0, 0, 1]}
+
+  # Marker id 1, centre (4, 2).
+  - {id: 1004, name: aruco1/c0_NE, xyz: [4.195, 2.195, 0.0], normal: [0, 0, 1]}
+  - {id: 1005, name: aruco1/c1_SE, xyz: [4.195, 1.805, 0.0], normal: [0, 0, 1]}
+  - {id: 1006, name: aruco1/c2_SW, xyz: [3.805, 1.805, 0.0], normal: [0, 0, 1]}
+  - {id: 1007, name: aruco1/c3_NW, xyz: [3.805, 2.195, 0.0], normal: [0, 0, 1]}
+
+  # Marker id 2, centre (4, -3).
+  - {id: 1008, name: aruco2/c0_NE, xyz: [4.195, -2.805, 0.0], normal: [0, 0, 1]}
+  - {id: 1009, name: aruco2/c1_SE, xyz: [4.195, -3.195, 0.0], normal: [0, 0, 1]}
+  - {id: 1010, name: aruco2/c2_SW, xyz: [3.805, -3.195, 0.0], normal: [0, 0, 1]}
+  - {id: 1011, name: aruco2/c3_NW, xyz: [3.805, -2.805, 0.0], normal: [0, 0, 1]}
+
+  # Marker id 3, centre (-2, -3).
+  - {id: 1012, name: aruco3/c0_NE, xyz: [-1.805, -2.805, 0.0], normal: [0, 0, 1]}
+  - {id: 1013, name: aruco3/c1_SE, xyz: [-1.805, -3.195, 0.0], normal: [0, 0, 1]}
+  - {id: 1014, name: aruco3/c2_SW, xyz: [-2.195, -3.195, 0.0], normal: [0, 0, 1]}
+  - {id: 1015, name: aruco3/c3_NW, xyz: [-2.195, -2.805, 0.0], normal: [0, 0, 1]}
+
+  # GATE CORNERS  (class 1, ids 2000-2999)
+
+  # opening_idx 0 - window_frame_1 BLUE
+  - {id: 2000, name: gate1_blue/top_left,     object: gate1_blue, type: gate_blue, xyz: [-0.60, -5.4975, 1.57]}
+  - {id: 2001, name: gate1_blue/top_right,    object: gate1_blue, type: gate_blue, xyz: [0.00, -5.4975, 1.57]}
+  - {id: 2002, name: gate1_blue/bottom_right, object: gate1_blue, type: gate_blue, xyz: [0.00, -5.4975, 1.07]}
+  - {id: 2003, name: gate1_blue/bottom_left,  object: gate1_blue, type: gate_blue, xyz: [-0.60, -5.4975, 1.07]}
+
+  # opening_idx 1 - window_frame_1 RED
+  - {id: 2004, name: gate1_red/top_left,      object: gate1_red,  type: gate_red,  xyz: [0.20, -5.4975, 1.52]}
+  - {id: 2005, name: gate1_red/top_right,     object: gate1_red,  type: gate_red,  xyz: [0.60, -5.4975, 1.52]}
+  - {id: 2006, name: gate1_red/bottom_right,  object: gate1_red,  type: gate_red,  xyz: [0.60, -5.4975, 1.12]}
+  - {id: 2007, name: gate1_red/bottom_left,   object: gate1_red,  type: gate_red,  xyz: [0.20, -5.4975, 1.12]}
+
+  # opening_idx 2 - window_frame_2 BLUE
+  - {id: 2008, name: gate2_blue/top_left,     object: gate2_blue, type: gate_blue, xyz: [-0.60, 1.2025, 1.57]}
+  - {id: 2009, name: gate2_blue/top_right,    object: gate2_blue, type: gate_blue, xyz: [0.00, 1.2025, 1.57]}
+  - {id: 2010, name: gate2_blue/bottom_right, object: gate2_blue, type: gate_blue, xyz: [0.00, 1.2025, 1.07]}
+  - {id: 2011, name: gate2_blue/bottom_left,  object: gate2_blue, type: gate_blue, xyz: [-0.60, 1.2025, 1.07]}
+
+  # opening_idx 3 - window_frame_2 RED
+  - {id: 2012, name: gate2_red/top_left,      object: gate2_red,  type: gate_red,  xyz: [0.20, 1.2025, 1.52]}
+  - {id: 2013, name: gate2_red/top_right,     object: gate2_red,  type: gate_red,  xyz: [0.60, 1.2025, 1.52]}
+  - {id: 2014, name: gate2_red/bottom_right,  object: gate2_red,  type: gate_red,  xyz: [0.60, 1.2025, 1.12]}
+  - {id: 2015, name: gate2_red/bottom_left,   object: gate2_red,  type: gate_red,  xyz: [0.20, 1.2025, 1.12]}
+
+  # Dark room windows
+
+  # opening_idx 4 - dark_room BLUE window
+  - {id: 2016, name: darkroom_blue/top_left,     object: darkroom_blue, type: gate_blue, xyz: [-3.25, 4.50, 2.20]}
+  - {id: 2017, name: darkroom_blue/top_right,    object: darkroom_blue, type: gate_blue, xyz: [-2.65, 4.50, 2.20]}
+  - {id: 2018, name: darkroom_blue/bottom_right, object: darkroom_blue, type: gate_blue, xyz: [-2.65, 4.50, 1.60]}
+  - {id: 2019, name: darkroom_blue/bottom_left,  object: darkroom_blue, type: gate_blue, xyz: [-3.25, 4.50, 1.60]}
+
+  # opening_idx 5 - dark_room RED window
+  - {id: 2020, name: darkroom_red/top_left,      object: darkroom_red,  type: gate_red,  xyz: [-1.65, 4.50, 2.10]}
+  - {id: 2021, name: darkroom_red/top_right,     object: darkroom_red,  type: gate_red,  xyz: [-1.25, 4.50, 2.10]}
+  - {id: 2022, name: darkroom_red/bottom_right,  object: darkroom_red,  type: gate_red,  xyz: [-1.25, 4.50, 1.70]}
+  - {id: 2023, name: darkroom_red/bottom_left,   object: darkroom_red,  type: gate_red,  xyz: [-1.65, 4.50, 1.70]}
+
+  # HORIZONTAL TUBE ENDPOINTS  (class 2, ids 3000-3999)
+
+  # tube_idx 0 - red_bar_1 at y=-4.4975, bar height z=1.60
+  - {id: 3000, name: red_bar1/end_left,  object: red_bar1, type: bar_red, xyz: [-0.75, -4.4975, 1.60], self_occlusion_m: 0.065}
+  - {id: 3001, name: red_bar1/end_right, object: red_bar1, type: bar_red, xyz: [0.75, -4.4975, 1.60], self_occlusion_m: 0.065}
+
+  # tube_idx 1 - blue_bar_1 at y=-3.4975, bar height z=0.80
+  - {id: 3002, name: blue_bar1/end_left,  object: blue_bar1, type: bar_blue, xyz: [-0.75, -3.4975, 0.80], self_occlusion_m: 0.065}
+  - {id: 3003, name: blue_bar1/end_right, object: blue_bar1, type: bar_blue, xyz: [0.75, -3.4975, 0.80], self_occlusion_m: 0.065}
+
+  # tube_idx 2 - blue_bar_2 at y=-2.4975, bar height z=0.80
+  - {id: 3004, name: blue_bar2/end_left,  object: blue_bar2, type: bar_blue, xyz: [-0.75, -2.4975, 0.80], self_occlusion_m: 0.065}
+  - {id: 3005, name: blue_bar2/end_right, object: blue_bar2, type: bar_blue, xyz: [0.75, -2.4975, 0.80], self_occlusion_m: 0.065}
+
+  # The pipe_gate pipes below carry no `type`: out of scope for the landmark
+  # detector, so they are published only by the ground-truth projector.
+
+  # tube_idx 3 - pipe_gate_1 horizontal pipe at y=-1.0, z=0.461
+  - {id: 3006, name: pipe_gate1_horiz/end_left,  xyz: [-0.5, -1.0, 0.461]}
+  - {id: 3007, name: pipe_gate1_horiz/end_right, xyz: [0.5, -1.0, 0.461]}
+
+  # tube_idx 4 - pipe_gate_1 diagonal pipe at y=-1.0, rising -X -> +X.
+  - {id: 3008, name: pipe_gate1_diag/end_low,  xyz: [-0.5, -1.0, 0.461]}
+  - {id: 3009, name: pipe_gate1_diag/end_high, xyz: [0.5, -1.0, 1.539]}
+
+  # VERTICAL TUBE ENDPOINTS  (class 3, ids 4000-4999)
+
+  # tube_idx 0 - middle_pipe_1 at (0, -0.2)
+  - {id: 4000, name: middle_pipe1/bottom, xyz: [0.0, -0.2, 0.0]}
+  - {id: 4001, name: middle_pipe1/top,    xyz: [0.0, -0.2, 2.0]}
+
+  # tube_idx 1 - pipe_gate_1 pipe_left at (-0.5, -1.0)
+  - {id: 4002, name: pipe_gate1_left/bottom, xyz: [-0.5, -1.0, 0.0]}
+  - {id: 4003, name: pipe_gate1_left/top,    xyz: [-0.5, -1.0, 2.0]}
+
+  # tube_idx 2 - pipe_gate_1 pipe_right at (+0.5, -1.0)
+  - {id: 4004, name: pipe_gate1_right/bottom, xyz: [0.5, -1.0, 0.0]}
+  - {id: 4005, name: pipe_gate1_right/top,    xyz: [0.5, -1.0, 2.0]}

@@ -3,7 +3,6 @@
 
 # include "LandmarkTypes.h"
 # include "UpdaterMapLandmarkOptions.h"
-# include <map>
 # include <memory>
 # include <mutex>
 # include <vector>
@@ -25,7 +24,7 @@ class State;
  */
 class UpdaterMapLandmark {
 public:
-    UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, std::map<int, MapLandmark> landmark_map);
+    UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, LandmarkMap landmark_map);
 
     /// Thread-safe: called by ant source (in-process detector or external topic subscriber)
     void feed_observations(const std::vector<LandmarkObservation> &obs);
@@ -44,7 +43,7 @@ private:
                                Eigen::MatrixXd &H_x, Eigen::VectorXd &res, 
                                std::vector<std::shared_ptr<ov_type::Type>> &x_order);
     UpdaterMapLandmarkOptions _opts;
-    std::map<int, MapLandmark> _map;
+    LandmarkMap _map;
     std::vector<LandmarkObservation> _pending;
     std::mutex _pending_mtx;
     bool _initialized = false;

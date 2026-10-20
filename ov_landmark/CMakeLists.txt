@@ -7,17 +7,16 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(OpenCV REQUIRED COMPONENTS core imgproc calib3d aruco)
 find_package(yaml-cpp REQUIRED)
-find_package(ov_core REQUIRED)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(ov_landmark_lib SHARED
-  src/dummy.cpp
+  src/LandmarkMap.cpp
 )
 
 target_include_directories(ov_landmark_lib
@@ -26,15 +25,12 @@ target_include_directories(ov_landmark_lib
     $<INSTALL_INTERFACE:include>
 )
 
-ament_target_dependencies(ov_landmark_lib
-  ov_core
-)
-
 target_link_libraries(ov_landmark_lib
   PUBLIC
     Eigen3::Eigen
+  PRIVATE
+    ament_index_cpp::ament_index_cpp
     yaml-cpp
-    ${OpenCV_LIBRARIES}
 )
 
 install(
@@ -50,12 +46,16 @@ install(
   DESTINATION include
 )
 
+install(
+  DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
+)
+
 ament_export_targets(export_ov_landmark HAS_LIBRARY_TARGET)
 ament_export_dependencies(
   Eigen3
-  OpenCV
+  ament_index_cpp
   yaml-cpp
-  ov_core
 )
 
 

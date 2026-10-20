@@ -43,6 +43,10 @@
 #include "update/UpdaterMapLandmark.h"
 #include "update/UpdaterSLAM.h"
 #include "update/UpdaterZeroVelocity.h"
+#include "ov_landmark/LandmarkMap.h"
+
+#include <stdexcept>
+#include <utility>
 
 using namespace ov_core;
 using namespace ov_type;
@@ -175,7 +179,14 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
 
   // If we are estimating T_MtoG, then create the map landmark updater
   if (state->_options.use_map_landmarks) {
-    updaterLANDMARK = std::make_shared<UpdaterMapLandmark>(params.map_landmark_options, std::map<int, MapLandmark>());
+    ov_landmark::LandmarkMap landmark_map;
+    try {
+      landmark_map = ov_landmark::load_landmark_map(params.map_landmark_options.map_landmarks_yaml);
+    } catch (const std::exception &e) {
+      PRINT_ERROR(RED "[MAP]: %s\n" RESET, e.what());
+      std::exit(EXIT_FAILURE);
+    }
+    updaterLANDMARK = std::make_shared<UpdaterMapLandmark>(params.map_landmark_options, std::move(landmark_map));
   }
 }
 

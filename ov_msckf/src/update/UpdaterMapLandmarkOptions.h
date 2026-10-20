@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "ov_landmark/LandmarkMap.h"
 #include "utils/colors.h"
 #include "utils/opencv_yaml_parse.h"
 #include "utils/print.h"
@@ -25,6 +26,7 @@ namespace ov_msckf {
  * and component z is yaw. Roll/pitch and yaw are given separate noise so the tilt can be kept tight.
  */
 struct UpdaterMapLandmarkOptions {
+    std::string map_landmarks_yaml; // Known landmark points in the map frame, loaded from a yaml file
     std::map<LandmarkType, LandmarkTypeConfig> type_cfg; // per-type config - noise/gating/enable
     int init_min_obs = 3; // observation times before delayed init
     double init_max_dist = 1e4; // PnP conditioning gate at init
@@ -86,6 +88,10 @@ struct UpdaterMapLandmarkOptions {
             }
             check_transform("map_initial_T_M_B", T_M_B_init);
 
+            // Landmark map: empty = ov_landmark's config/landmarks.yaml, relative = relative to this config file
+            parser->parse_config("map_landmarks_yaml", map_landmarks_yaml, false);
+            map_landmarks_yaml = ov_landmark::resolve_landmark_map_path(map_landmarks_yaml, parser->get_config_folder());
+
             // Optional: stays identity (body == IMU) if the imu chain has no T_i_b
             parser->parse_external("relative_config_imu", "imu0", "T_i_b", T_I_B, false);
             check_transform("imu0.T_i_b", T_I_B);
@@ -103,6 +109,7 @@ struct UpdaterMapLandmarkOptions {
         ss << "  - map_initial_T_M_B:" << std::endl << T_M_B_init << std::endl;
         ss << "  - imu0.T_i_b:" << std::endl << T_I_B << std::endl;
         PRINT_DEBUG(ss.str().c_str());
+        PRINT_DEBUG("  - map_landmarks_yaml: %s\n", map_landmarks_yaml.c_str());
         PRINT_DEBUG("  - map_sigma0: rp %.3f deg | yaw %.3f deg | pos %.3f m\n", sigma0_rp_deg, sigma0_yaw_deg, sigma0_pos_m);
         PRINT_DEBUG("  - map_rw: rp %.4f deg/sqrt(s) | yaw %.4f deg/sqrt(s) | pos %.4f m/sqrt(s)\n", rw_rp_deg_sqrt_s, rw_yaw_deg_sqrt_s,
                     rw_pos_m_sqrt_s);
