@@ -313,26 +313,30 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
   }
   }
 
-  // ArUco detections from as2 (map landmarks)
+  // Landmark detections, one subscription per map stream (as2 ObjectPerceptionArray)
   const UpdaterMapLandmarkOptions map_options = _app->get_params().map_landmark_options;
-  if (_app->get_state()->_options.use_map_landmarks && !map_options.map_aruco_topic.empty()) {
+  if (_app->get_state()->_options.use_map_landmarks) {
     aruco_corner_offset = map_options.map_aruco_corner_offset;
-    aruco_timeshift = map_options.map_aruco_timeshift_cam_imu;
-    sub_aruco = _node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
-        map_options.map_aruco_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_aruco, this, std::placeholders::_1));
-    PRINT_INFO("subscribing to aruco: %s\n", map_options.map_aruco_topic.c_str());
-  }
-  // Object detections without identity (e.g. YOLO), matched to the map inside the filter
-  if (_app->get_state()->_options.use_map_landmarks && !map_options.map_object_topic.empty()) {
-    sub_objects = _node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
-        map_options.map_object_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_objects, this, std::placeholders::_1));
-    PRINT_INFO("subscribing to objects: %s\n", map_options.map_object_topic.c_str());
+    for (int i = 0; i < (int)map_options.streams.size(); i++) {
+      const MapStream &st = map_options.streams.at(i);
+      if (st.type == "aruco") {
+        subs_landmarks.push_back(_node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
+            st.topic, rclcpp::SensorDataQoS(),
+            [this, i](const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) { callback_aruco(msg, i); }));
+      } else {
+        subs_landmarks.push_back(_node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
+            st.topic, rclcpp::SensorDataQoS(),
+            [this, i](const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) { callback_objects(msg, i); }));
+      }
+      PRINT_INFO("subscribing to landmarks (%s, %s): %s\n", st.type.c_str(), st.cam.c_str(), st.topic.c_str());
+    }
   }
 }
 
-void ROS2Visualizer::callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) {
+void ROS2Visualizer::callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream) {
   LandmarkObservation obs;
-  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds() + aruco_timeshift;
+  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds();
+  obs.stream = stream;
   for (const auto &perception : msg->perceptions) {
     ObjectDetection det;
     det.type = perception.hypothesis.hypothesis.class_id;
@@ -348,9 +352,10 @@ void ROS2Visualizer::callback_objects(const as2_msgs::msg::ObjectPerceptionArray
   }
 }
 
-void ROS2Visualizer::callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) {
+void ROS2Visualizer::callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream) {
   LandmarkObservation obs;
-  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds() + aruco_timeshift;
+  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds();
+  obs.stream = stream;
   for (const auto &perception : msg->perceptions) {
     int marker_id = 0;
     try {

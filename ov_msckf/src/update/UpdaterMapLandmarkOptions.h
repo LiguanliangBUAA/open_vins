@@ -20,6 +20,16 @@
 
 namespace ov_msckf {
 
+/// One landmark observation input: a detection topic seen by one camera of relative_config_imucam
+struct MapStream {
+    std::string topic;
+    std::string type = "aruco"; // aruco (ids known) | objects (e.g. YOLO, matched to the map in the filter)
+    std::string cam = "cam3";
+    Eigen::Matrix4d T_C_I = Eigen::Matrix4d::Identity(); // p_C = T_C_I * p_I
+    std::shared_ptr<ov_core::CamBase> camera;
+    double dt = 0.0; // added to the image stamp to get the cam0 clock of the clones: timeshift(cam) - timeshift(cam0)
+};
+
 /**
  * @brief Options for the map-to-global transform T_MtoG and the map landmark update
  *
@@ -73,24 +83,17 @@ struct UpdaterMapLandmarkOptions {
         return q;
     }
 
-    /// Aruco perception input
-    std::string map_aruco_topic = "/drone0/detections/aruco/front";
-    std::string map_aruco_cam = "cam3";
+    /// Observation inputs, map_stream<i>_topic / _type / _cam for i < map_streams. All are as2 ObjectPerceptionArray.
+    /// aruco: class_id = marker id. objects: class_id = landmark object type, keypoints in id order.
+    std::vector<MapStream> streams;
     int map_aruco_corner_offset = 0;
-    double map_aruco_timeshift_cam_imu = 0.0;
 
-    /// Object detector input (e.g. YOLO): as2 ObjectPerceptionArray, class_id = landmark object type, keypoints in id order.
-    /// Seen by map_aruco_cam. Objects are matched to the map by projecting them with the current state. Empty = off.
-    std::string map_object_topic = "";
+    /// Matching of object detections to the map
     double map_match_px = 40.0; // gate on the mean keypoint distance to the predicted object (+ 3 sigma of the prediction)
     double map_match_scale = 0.15; // + this * sqrt(box area), near objects get more slack
     double map_ambiguity_ratio = 1.5; // the second best object must cost this much more than the best
     double map_keypoint_conf = 0.5; // keypoints below this score are ignored
     double map_keypoint_match_px = 25.0; // a matched keypoint deviating this much from the object's mean shift is dropped
-
-    /// ArUco camera calibration from relative_config_imucam, p_C = T_C_I * p_I
-    Eigen::Matrix4d aruco_T_C_I = Eigen::Matrix4d::Identity();
-    std::shared_ptr<ov_core::CamBase> aruco_camera;
 
     /// Landmark update
     bool map_update_dry_run = true; // only compute and print the residuals
@@ -139,8 +142,21 @@ struct UpdaterMapLandmarkOptions {
             parser->parse_config("map_nav_pose_topic", nav_pose_topic, false);
             parser->parse_config("map_nav_twist_topic", nav_twist_topic, false);
 
-            parser->parse_config("map_aruco_topic", map_aruco_topic, false);
-            parser->parse_config("map_aruco_cam", map_aruco_cam, false);
+            int n_streams = 0;
+            parser->parse_config("map_streams", n_streams, false);
+            for (int i = 0; i < n_streams; i++) {
+                MapStream st;
+                std::string prefix = "map_stream" + std::to_string(i) + "_";
+                parser->parse_config(prefix + "topic", st.topic);
+                parser->parse_config(prefix + "type", st.type);
+                parser->parse_config(prefix + "cam", st.cam);
+                if (st.type != "aruco" && st.type != "objects") {
+                    PRINT_ERROR(RED "%stype must be aruco or objects (got %s)\n" RESET, prefix.c_str(), st.type.c_str());
+                    std::exit(EXIT_FAILURE);
+                }
+                load_camera(parser, st);
+                streams.push_back(st);
+            }
             parser->parse_config("map_aruco_corner_offset", map_aruco_corner_offset, false);
 
             if (map_aruco_corner_offset < -3 || map_aruco_corner_offset > 3) {
@@ -148,11 +164,7 @@ struct UpdaterMapLandmarkOptions {
                               map_aruco_corner_offset);
             }
             map_aruco_corner_offset = ((map_aruco_corner_offset % 4) + 4) % 4;
-            
-            parser->parse_config("map_aruco_timeshift_cam_imu", map_aruco_timeshift_cam_imu, false);
-            load_aruco_camera(parser);
 
-            parser->parse_config("map_object_topic", map_object_topic, false);
             parser->parse_config("map_match_px", map_match_px, false);
             parser->parse_config("map_match_scale", map_match_scale, false);
             parser->parse_config("map_ambiguity_ratio", map_ambiguity_ratio, false);
@@ -181,18 +193,18 @@ struct UpdaterMapLandmarkOptions {
                     rw_pos_m_sqrt_s);
         PRINT_DEBUG("  - map_nav_pose_topic: %s\n", nav_pose_topic.c_str());
         PRINT_DEBUG("  - map_nav_twist_topic: %s\n", nav_twist_topic.c_str());
-        PRINT_DEBUG("  - map_aruco_topic: %s\n", map_aruco_topic.c_str());
-        PRINT_DEBUG("  - map_aruco_cam: %s | corner_offset %d | timeshift %.4f s\n", map_aruco_cam.c_str(), map_aruco_corner_offset,
-                    map_aruco_timeshift_cam_imu);
-        if (aruco_camera != nullptr) {
+        for (size_t i = 0; i < streams.size(); i++) {
+            const MapStream &st = streams.at(i);
             std::stringstream ss_cam;
-            ss_cam << "  - aruco T_C_I:" << std::endl << aruco_T_C_I << std::endl;
-            ss_cam << "  - aruco intrinsics (fx fy cx cy d0..d3): " << aruco_camera->get_value().transpose() << " | " << aruco_camera->w()
-                   << "x" << aruco_camera->h() << std::endl;
+            ss_cam << "  - map_stream" << i << ": " << st.type << " | " << st.topic << " | " << st.cam << " | dt " << st.dt << " s" << std::endl;
+            ss_cam << "    T_C_I:" << std::endl << st.T_C_I << std::endl;
+            ss_cam << "    intrinsics (fx fy cx cy d0..d3): " << st.camera->get_value().transpose() << " | " << st.camera->w() << "x"
+                   << st.camera->h() << std::endl;
             PRINT_DEBUG(ss_cam.str().c_str());
         }
-        PRINT_DEBUG("  - map_object_topic: %s | match %.0f px + %.2f sqrt(area) | ambiguity %.1f | kpt conf %.2f, %.0f px\n",
-                    map_object_topic.c_str(), map_match_px, map_match_scale, map_ambiguity_ratio, map_keypoint_conf, map_keypoint_match_px);
+        PRINT_DEBUG("  - map_aruco_corner_offset: %d\n", map_aruco_corner_offset);
+        PRINT_DEBUG("  - objects: match %.0f px + %.2f sqrt(area) + 3 sigma | ambiguity %.1f | kpt conf %.2f, %.0f px\n", map_match_px,
+                    map_match_scale, map_ambiguity_ratio, map_keypoint_conf, map_keypoint_match_px);
         PRINT_DEBUG("  - map_update_dry_run: %d | map_check_jacobian: %d | map_max_clone_dt: %.4f s\n", map_update_dry_run,
                     map_check_jacobian, map_max_clone_dt);
         PRINT_DEBUG("  - map_sigma_px: %.2f | map_sigma_landmark_pos_m: %.3f | map_chi2_2d_threshold: %.2f\n", map_sigma_px,
@@ -203,27 +215,33 @@ struct UpdaterMapLandmarkOptions {
     }
 
 private:
-    void load_aruco_camera(const std::shared_ptr<ov_core::YamlParser> &parser) {
-        parser->parse_external("relative_config_imucam", map_aruco_cam, "T_cam_imu", aruco_T_C_I);
-        check_transform(map_aruco_cam + ".T_cam_imu", aruco_T_C_I);
+    static void load_camera(const std::shared_ptr<ov_core::YamlParser> &parser, MapStream &st) {
+        parser->parse_external("relative_config_imucam", st.cam, "T_cam_imu", st.T_C_I);
+        check_transform(st.cam + ".T_cam_imu", st.T_C_I);
+
+        // kalibr: t_imu = t_cam + timeshift_cam_imu. The clones are stamped in the cam0 clock.
+        double shift = 0.0, shift_cam0 = 0.0;
+        parser->parse_external("relative_config_imucam", st.cam, "timeshift_cam_imu", shift, false);
+        parser->parse_external("relative_config_imucam", "cam0", "timeshift_cam_imu", shift_cam0, false);
+        st.dt = shift - shift_cam0;
 
         std::string dist_model = "radtan";
         std::vector<double> k = {1, 1, 0, 0};
         std::vector<double> d = {0, 0, 0, 0};
         std::vector<int> wh = {1, 1};
-        parser->parse_external("relative_config_imucam", map_aruco_cam, "distortion_model", dist_model);
-        parser->parse_external("relative_config_imucam", map_aruco_cam, "intrinsics", k);
-        parser->parse_external("relative_config_imucam", map_aruco_cam, "distortion_coeffs", d);
-        parser->parse_external("relative_config_imucam", map_aruco_cam, "resolution", wh);
+        parser->parse_external("relative_config_imucam", st.cam, "distortion_model", dist_model);
+        parser->parse_external("relative_config_imucam", st.cam, "intrinsics", k);
+        parser->parse_external("relative_config_imucam", st.cam, "distortion_coeffs", d);
+        parser->parse_external("relative_config_imucam", st.cam, "resolution", wh);
 
         Eigen::VectorXd calib(8);
         calib << k.at(0), k.at(1), k.at(2), k.at(3), d.at(0), d.at(1), d.at(2), d.at(3);
         if (dist_model == "equidistant") {
-            aruco_camera = std::make_shared<ov_core::CamEqui>(wh.at(0), wh.at(1));
+            st.camera = std::make_shared<ov_core::CamEqui>(wh.at(0), wh.at(1));
         } else {
-            aruco_camera = std::make_shared<ov_core::CamRadtan>(wh.at(0), wh.at(1));
+            st.camera = std::make_shared<ov_core::CamRadtan>(wh.at(0), wh.at(1));
         }
-        aruco_camera->set_value(calib);
+        st.camera->set_value(calib);
     }
 
     static void check_transform(const std::string &name, const Eigen::Matrix4d &T) {

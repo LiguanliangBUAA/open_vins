@@ -131,10 +131,10 @@ public:
                              int cam_id0, int cam_id1);
 
   /// Callback for as2 ArUco detections (map landmarks)
-  void callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg);
+  void callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream);
 
   /// Callback for object detections without identity, e.g. YOLO (class = landmark object type)
-  void callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg);
+  void callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream);
 
 protected:
   /// Publish the current state
@@ -197,9 +197,8 @@ protected:
   std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> sub_stereo_depth;
 
   // ArUco detections for the map landmark update
-  rclcpp::Subscription<as2_msgs::msg::ObjectPerceptionArray>::SharedPtr sub_aruco, sub_objects;
+  std::vector<rclcpp::Subscription<as2_msgs::msg::ObjectPerceptionArray>::SharedPtr> subs_landmarks;
   int aruco_corner_offset = 0;
-  double aruco_timeshift = 0.0;
 
   // Live groundtruth subscribers (from simulator topic)
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_gt;

@@ -150,14 +150,19 @@ use_map_landmarks: true
 # a relative path is relative to this file's folder.
 map_landmarks_yaml: ""
 
-# perception related
-map_aruco_topic: "/drone0/detections/aruco/front"
-map_aruco_cam: "cam3"
+# Observation inputs (as2 ObjectPerceptionArray), one per detection topic and camera of relative_config_imucam.
+# type aruco: class_id = marker id. type objects (e.g. YOLO): class_id = `type` in the landmark map, keypoints in id
+# order, matched to map objects by projecting them with the current state. The camera time offset comes from kalibr.
+map_streams: 2
+map_stream0_topic: "/drone0/detections/aruco/front"
+map_stream0_type: "aruco"
+map_stream0_cam: "cam3"
+map_stream1_topic: "/drone0/detections/aruco/down"
+map_stream1_type: "aruco"
+map_stream1_cam: "cam2"
 map_aruco_corner_offset: 0
 
-# Object detector (e.g. YOLO): as2 ObjectPerceptionArray, class_id = `type` in the landmark map, keypoints in id order.
-# Detections are matched to map objects by projecting them with the current state. "" = off.
-map_object_topic: ""
+# Matching of `objects` detections
 map_match_px: 40.0
 map_match_scale: 0.15
 map_ambiguity_ratio: 1.5

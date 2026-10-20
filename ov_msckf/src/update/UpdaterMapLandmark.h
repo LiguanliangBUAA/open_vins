@@ -27,7 +27,7 @@ class UpdaterMapLandmark {
 public:
     UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, LandmarkMap landmark_map, std::vector<LandmarkObject> objects = {});
 
-    /// Thread-safe. Points whose id is not in the map and objects of an unknown type are dropped.
+    /// Thread-safe. Shifts the stamp to the cam0 clock; points whose id is not in the map and objects of an unknown type are dropped.
     void feed_observation(const LandmarkObservation &obs);
 
     /// Call once per image after the state is propagated to it: initializes T_MtoG, then propagates it
@@ -57,7 +57,7 @@ private:
                  Eigen::MatrixXd *H, std::vector<bool> *in_front = nullptr) const;
     /// Matches object detections to map objects of the same type by projecting them with the current state,
     /// appends the keypoints of the matched ones to points. Returns the number of matched objects.
-    int associate(std::shared_ptr<State> state, const ClonePair &cp, const std::vector<ObjectDetection> &dets,
+    int associate(std::shared_ptr<State> state, const ClonePair &cp, const LandmarkObservation &obs,
                   std::vector<LandmarkPoint> &points) const;
     /// Scales the T_MtoG covariance (and its cross terms) by factor
     void inflate_T_MtoG(std::shared_ptr<State> state, double factor) const;

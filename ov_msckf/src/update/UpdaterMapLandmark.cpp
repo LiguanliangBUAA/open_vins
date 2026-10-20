@@ -56,8 +56,12 @@ UpdaterMapLandmark::UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, LandmarkM
     }
 
 void UpdaterMapLandmark::feed_observation(const LandmarkObservation &obs) {
+    if (obs.stream < 0 || obs.stream >= (int)_opts.streams.size()) {
+        return;
+    }
     LandmarkObservation known;
-    known.timestamp = obs.timestamp;
+    known.timestamp = obs.timestamp + _opts.streams.at(obs.stream).dt;
+    known.stream = obs.stream;
     for (const auto &p : obs.points) {
         if (_map.count(p.id) > 0) {
             known.points.push_back(p);
@@ -98,7 +102,7 @@ void UpdaterMapLandmark::update(std::shared_ptr<State> state) {
 
         // Objects without identity become landmark points once matched to the map
         LandmarkObservation obs = obs_in;
-        int n_matched = associate(state, cp, obs_in.objects, obs.points);
+        int n_matched = associate(state, cp, obs_in, obs.points);
         _n_objects_matched += n_matched;
         _n_objects_unmatched += (int)obs_in.objects.size() - n_matched;
         if (!obs_in.objects.empty()) {
@@ -261,8 +265,9 @@ std::vector<std::shared_ptr<Type>> UpdaterMapLandmark::h_order(std::shared_ptr<S
     return {cp.c0, cp.c1, state->_T_MtoG};
 }
 
-int UpdaterMapLandmark::associate(std::shared_ptr<State> state, const ClonePair &cp, const std::vector<ObjectDetection> &dets,
+int UpdaterMapLandmark::associate(std::shared_ptr<State> state, const ClonePair &cp, const LandmarkObservation &obs,
                                   std::vector<LandmarkPoint> &points) const {
+    const std::vector<ObjectDetection> &dets = obs.objects;
     if (dets.empty()) {
         return 0;
     }
@@ -282,6 +287,7 @@ int UpdaterMapLandmark::associate(std::shared_ptr<State> state, const ClonePair 
             continue;
         }
         LandmarkObservation o;
+        o.stream = obs.stream;
         for (LandmarkId id : obj.ids) {
             o.points.push_back({id, 0.0, 0.0});
         }
@@ -421,8 +427,9 @@ bool UpdaterMapLandmark::predict(std::shared_ptr<State> state, const ClonePair &
     }
     Eigen::Matrix3d R_MtoG = state->_T_MtoG->Rot();
     Eigen::Vector3d p_GinM = state->_T_MtoG->pos();
-    Eigen::Matrix3d R_ItoC = _opts.aruco_T_C_I.block<3, 3>(0, 0);
-    Eigen::Vector3d p_IinC = _opts.aruco_T_C_I.block<3, 1>(0, 3);
+    const MapStream &st = _opts.streams.at(obs.stream);
+    Eigen::Matrix3d R_ItoC = st.T_C_I.block<3, 3>(0, 0);
+    Eigen::Vector3d p_IinC = st.T_C_I.block<3, 1>(0, 3);
 
     size_t n = obs.points.size();
     uv.setZero(2 * n);
@@ -442,8 +449,8 @@ bool UpdaterMapLandmark::predict(std::shared_ptr<State> state, const ClonePair &
         bool visible = p_C(2) >= 0.1;
         if (visible) {
             Eigen::Vector2d uv_norm(p_C(0) / p_C(2), p_C(1) / p_C(2));
-            uv.segment<2>(2 * i) = _opts.aruco_camera->distort_d(uv_norm);
-            double w = _opts.aruco_camera->w(), h = _opts.aruco_camera->h();
+            uv.segment<2>(2 * i) = st.camera->distort_d(uv_norm);
+            double w = st.camera->w(), h = st.camera->h();
             visible = uv(2 * i) > -0.5 * w && uv(2 * i) < 1.5 * w && uv(2 * i + 1) > -0.5 * h && uv(2 * i + 1) < 1.5 * h;
         }
         if (!visible) {
@@ -458,7 +465,7 @@ bool UpdaterMapLandmark::predict(std::shared_ptr<State> state, const ClonePair &
 
         if (H != nullptr) {
             Eigen::MatrixXd H_dz_dzn, H_dz_dzeta;
-            _opts.aruco_camera->compute_distort_jacobian(uv_norm, H_dz_dzn, H_dz_dzeta);
+            st.camera->compute_distort_jacobian(uv_norm, H_dz_dzn, H_dz_dzeta);
             Eigen::Matrix<double, 2, 3> dzn_dpc;
             dzn_dpc << 1 / p_C(2), 0, -p_C(0) / (p_C(2) * p_C(2)), 0, 1 / p_C(2), -p_C(1) / (p_C(2) * p_C(2));
             Eigen::Matrix<double, 2, 3> J = H_dz_dzn * dzn_dpc * R_ItoC;
@@ -482,9 +489,9 @@ bool UpdaterMapLandmark::predict(std::shared_ptr<State> state, const ClonePair &
 
 void UpdaterMapLandmark::print_frame(const LandmarkObservation &obs, const ClonePair &cp, int n_front, int n_kept, double median_r,
                                      double max_chi2) const {
-    PRINT_INFO("[MAP]: t = %.3f | lambda %.2f | pts %zu, in front %d, kept %d | |r| median %.1f px | max chi2 %.1f / %.1f | frames: "
+    PRINT_INFO("[MAP]: t = %.3f | %s | lambda %.2f | pts %zu, in front %d, kept %d | |r| median %.1f px | max chi2 %.1f / %.1f | frames: "
                "accepted %d, rejected %d | points: rejected %d, behind %d | inflations %d | no clone %d\n",
-               obs.timestamp, cp.lambda, obs.points.size(), n_front, n_kept, median_r, max_chi2, _opts.map_chi2_2d_threshold, _n_accepted,
+               obs.timestamp, _opts.streams.at(obs.stream).cam.c_str(), cp.lambda, obs.points.size(), n_front, n_kept, median_r, max_chi2, _opts.map_chi2_2d_threshold, _n_accepted,
                _n_rejected, _n_points_rejected, _n_points_behind, _n_cov_inflations, _n_no_clone);
 }
 

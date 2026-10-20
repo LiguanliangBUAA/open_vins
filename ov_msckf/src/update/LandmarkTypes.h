@@ -37,6 +37,7 @@ struct ObjectDetection {
 // All landmark points seen in one image. points have known ids (e.g. ArUco), objects are matched to the map in the filter.
 struct LandmarkObservation {
     double timestamp = -1.0;
+    int stream = 0; // index into UpdaterMapLandmarkOptions::streams, selects the camera
     std::vector<LandmarkPoint> points;
     std::vector<ObjectDetection> objects;
 };
