@@ -9,7 +9,7 @@
 
 Our codebase is built on top of [ROS2 Humble](https://docs.ros.org/en/humble/) on Ubuntu 22.04, which is the only supported platform.
 ROS2 Humble includes [OpenCV](https://github.com/opencv/opencv) 4.5; we use the contributed modules for Aruco feature extraction.
-The map landmark update additionally needs the `as2_msgs` messages of [Aerostack2](https://github.com/aerostack2/aerostack2).
+Landmark detections come in as `ov_landmark_msgs`; the optional `ov_landmark_as2` package converts [Aerostack2](https://github.com/aerostack2/aerostack2) detections and needs `as2_msgs` at runtime only.
 Please see the [official instructions](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html) to install ROS2 Humble, or:
 
 @code{.shell-session}
@@ -27,7 +27,6 @@ source ~/.bashrc
 @section gs-install-openvins Cloning the OpenVINS Project
 
 Now that we have ROS2 installed we can setup a colcon workspace and build the project!
-The workspace that provides `as2_msgs` (Aerostack2) has to be sourced before building.
 If you run into any problems please google search the issue first and if you are unable to find a solution please open an issue on our github page.
 After the build is successful please following the @ref gs-tutorial guide on getting a dataset and running the system.
 
@@ -44,7 +43,7 @@ cd ~/workspace/ov_ws/src/
 git clone https://github.com/rpng/open_vins/
 cd ..
 colcon build
-colcon build --event-handlers console_cohesion+ --packages-select ov_core ov_init ov_landmark ov_msckf ov_eval # verbose output
+colcon build --event-handlers console_cohesion+ --packages-select ov_core ov_init ov_landmark_msgs ov_landmark ov_msckf ov_eval # verbose output
 @endcode
 
 We recommend compiling with RelWithDebInfo as we always include [-g](https://gcc.gnu.org/onlinedocs/gcc/Debugging-Options.html) for debug symbols.

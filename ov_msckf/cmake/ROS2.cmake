@@ -14,8 +14,7 @@ find_package(image_transport REQUIRED)
 find_package(ov_core REQUIRED)
 find_package(ov_init REQUIRED)
 find_package(ov_landmark REQUIRED)
-find_package(as2_msgs REQUIRED)
-find_package(vision_msgs REQUIRED)
+find_package(ov_landmark_msgs REQUIRED)
 
 
 # Include our header files
@@ -45,8 +44,7 @@ list(APPEND ament_libraries
         ov_core
         ov_init
         ov_landmark
-        as2_msgs
-        vision_msgs
+        ov_landmark_msgs
 )
 
 ##################################################

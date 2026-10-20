@@ -23,7 +23,6 @@ namespace ov_msckf {
 /// One landmark observation input: a detection topic seen by one camera of relative_config_imucam
 struct MapStream {
     std::string topic;
-    std::string type = "aruco"; // aruco (ids known) | objects (e.g. YOLO, matched to the map in the filter)
     std::string cam = "cam3";
     Eigen::Matrix4d T_C_I = Eigen::Matrix4d::Identity(); // p_C = T_C_I * p_I
     std::shared_ptr<ov_core::CamBase> camera;
@@ -64,6 +63,10 @@ struct UpdaterMapLandmarkOptions {
     std::string nav_pose_topic = "";
     std::string nav_twist_topic = "";
 
+    /// Time constant of the map-frame output smoothing [s], 0 = off. Only the published pose and TF are smoothed,
+    /// so a landmark correction is blended in over ~tau instead of jumping (map_alignment_ekf smooth_tau)
+    double smooth_tau = 0.0;
+
     /// Initial covariance diagonal of T_MtoG in [rot, pos] order
     Eigen::Matrix<double, 6, 1> sigma0_vec() const {
         Eigen::Matrix<double, 6, 1> s;
@@ -83,8 +86,8 @@ struct UpdaterMapLandmarkOptions {
         return q;
     }
 
-    /// Observation inputs, map_stream<i>_topic / _type / _cam for i < map_streams. All are as2 ObjectPerceptionArray.
-    /// aruco: class_id = marker id. objects: class_id = landmark object type, keypoints in id order.
+    /// Observation inputs, map_stream<i>_topic / _cam for i < map_streams, all ov_landmark_msgs/LandmarkDetectionArray.
+    /// A detection of type "aruco" with an id uses the marker corners, any other is matched to the map objects of its type.
     std::vector<MapStream> streams;
     int map_aruco_corner_offset = 0;
 
@@ -141,6 +144,7 @@ struct UpdaterMapLandmarkOptions {
             parser->parse_config("map_rw_pos_m_sqrt_s", rw_pos_m_sqrt_s, false);
             parser->parse_config("map_nav_pose_topic", nav_pose_topic, false);
             parser->parse_config("map_nav_twist_topic", nav_twist_topic, false);
+            parser->parse_config("map_smooth_tau", smooth_tau, false);
 
             int n_streams = 0;
             parser->parse_config("map_streams", n_streams, false);
@@ -148,12 +152,7 @@ struct UpdaterMapLandmarkOptions {
                 MapStream st;
                 std::string prefix = "map_stream" + std::to_string(i) + "_";
                 parser->parse_config(prefix + "topic", st.topic);
-                parser->parse_config(prefix + "type", st.type);
                 parser->parse_config(prefix + "cam", st.cam);
-                if (st.type != "aruco" && st.type != "objects") {
-                    PRINT_ERROR(RED "%stype must be aruco or objects (got %s)\n" RESET, prefix.c_str(), st.type.c_str());
-                    std::exit(EXIT_FAILURE);
-                }
                 load_camera(parser, st);
                 streams.push_back(st);
             }
@@ -193,10 +192,11 @@ struct UpdaterMapLandmarkOptions {
                     rw_pos_m_sqrt_s);
         PRINT_DEBUG("  - map_nav_pose_topic: %s\n", nav_pose_topic.c_str());
         PRINT_DEBUG("  - map_nav_twist_topic: %s\n", nav_twist_topic.c_str());
+        PRINT_DEBUG("  - map_smooth_tau: %.2f s\n", smooth_tau);
         for (size_t i = 0; i < streams.size(); i++) {
             const MapStream &st = streams.at(i);
             std::stringstream ss_cam;
-            ss_cam << "  - map_stream" << i << ": " << st.type << " | " << st.topic << " | " << st.cam << " | dt " << st.dt << " s" << std::endl;
+            ss_cam << "  - map_stream" << i << ": " << st.topic << " | " << st.cam << " | dt " << st.dt << " s" << std::endl;
             ss_cam << "    T_C_I:" << std::endl << st.T_C_I << std::endl;
             ss_cam << "    intrinsics (fx fy cx cy d0..d3): " << st.camera->get_value().transpose() << " | " << st.camera->w() << "x"
                    << st.camera->h() << std::endl;

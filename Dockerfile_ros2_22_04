@@ -12,14 +12,7 @@ FROM osrf/ros:humble-desktop
 # =========================================================
 
 # Dependencies we use, and some helper utilities for fast in terminal edits (nano etc)
-RUN apt-get update && apt-get install -y libeigen3-dev libyaml-cpp-dev nano git ros-humble-vision-msgs
-
-# as2_msgs (Aerostack2) for the map landmark observations. ObjectPerceptionArray is newer than the
-# released ros-humble-as2-msgs, so build it from source in an underlay that the workspace sources.
-RUN mkdir -p /as2_ws/src && cd /as2_ws/src && \
-    git clone --depth 1 https://github.com/aerostack2/aerostack2.git && \
-    cd /as2_ws && . /opt/ros/humble/setup.sh && colcon build --packages-select as2_msgs && \
-    echo "source /as2_ws/install/setup.bash" >> /root/.bashrc
+RUN apt-get update && apt-get install -y libeigen3-dev libyaml-cpp-dev nano git
 
 # Ceres solver install and setup
 RUN sudo apt-get install -y cmake libgoogle-glog-dev libgflags-dev libatlas-base-dev libeigen3-dev libsuitesparse-dev libceres-dev

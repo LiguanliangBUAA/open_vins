@@ -22,7 +22,7 @@
 #ifndef OV_MSCKF_ROS2VISUALIZER_H
 #define OV_MSCKF_ROS2VISUALIZER_H
 
-#include <as2_msgs/msg/object_perception_array.hpp>
+#include <ov_landmark_msgs/msg/landmark_detection_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -131,10 +131,9 @@ public:
                              int cam_id0, int cam_id1);
 
   /// Callback for as2 ArUco detections (map landmarks)
-  void callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream);
 
-  /// Callback for object detections without identity, e.g. YOLO (class = landmark object type)
-  void callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream);
+  /// Callback for landmark detections: ArUco (type "aruco" with a marker id) and objects without identity (e.g. YOLO)
+  void callback_landmarks(const ov_landmark_msgs::msg::LandmarkDetectionArray::SharedPtr msg, int stream);
 
 protected:
   /// Publish the current state
@@ -173,6 +172,16 @@ protected:
 
   /// ^I T_B (kalibr imu0.T_i_b), used to turn the map frame imu outputs into base_link outputs
   Eigen::Matrix4d T_I_B = Eigen::Matrix4d::Identity();
+
+  /// Complementary filter on the published base_link pose in M: predicted with the body velocity, pulled toward the
+  /// estimate with time constant smooth_tau. Replaces R_MtoB / p_BinM by the smoothed pose.
+  void smooth_map_pose(double timestamp, const Eigen::Vector3d &v_BinM, const Eigen::Vector3d &w_B, Eigen::Matrix3d &R_MtoB,
+                       Eigen::Vector3d &p_BinM);
+  double smooth_tau = 0.0;
+  bool smooth_init = false;
+  double smooth_last_t = -1.0;
+  Eigen::Matrix3d smooth_R_MtoB = Eigen::Matrix3d::Identity();
+  Eigen::Vector3d smooth_p_BinM = Eigen::Vector3d::Zero();
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr pub_pathimu;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_points_msckf, pub_points_slam, pub_points_aruco, pub_points_sim;
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr pub_loop_pose, pub_loop_extrinsic;
@@ -197,7 +206,7 @@ protected:
   std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> sub_stereo_depth;
 
   // ArUco detections for the map landmark update
-  std::vector<rclcpp::Subscription<as2_msgs::msg::ObjectPerceptionArray>::SharedPtr> subs_landmarks;
+  std::vector<rclcpp::Subscription<ov_landmark_msgs::msg::LandmarkDetectionArray>::SharedPtr> subs_landmarks;
   int aruco_corner_offset = 0;
 
   // Live groundtruth subscribers (from simulator topic)

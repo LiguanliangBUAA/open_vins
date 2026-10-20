@@ -34,8 +34,7 @@
     <depend>ov_core</depend>
     <depend>ov_init</depend>
     <depend>ov_landmark</depend>
-    <depend>as2_msgs</depend>
-    <depend>vision_msgs</depend>
+    <depend>ov_landmark_msgs</depend>
 
     <!-- System dependencies -->
     <depend>eigen</depend>

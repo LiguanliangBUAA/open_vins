@@ -150,15 +150,14 @@ use_map_landmarks: true
 # a relative path is relative to this file's folder.
 map_landmarks_yaml: ""
 
-# Observation inputs (as2 ObjectPerceptionArray), one per detection topic and camera of relative_config_imucam.
-# type aruco: class_id = marker id. type objects (e.g. YOLO): class_id = `type` in the landmark map, keypoints in id
-# order, matched to map objects by projecting them with the current state. The camera time offset comes from kalibr.
+# Observation inputs (ov_landmark_msgs/LandmarkDetectionArray), one per detection topic and camera of relative_config_imucam.
+# A detection of type "aruco" with an id uses the marker corners; any other type (e.g. YOLO gate_blue) is matched to the
+# landmark map objects of that type by projecting them with the current state. The camera time offset comes from kalibr.
+# Aerostack2 detections are converted by: ros2 run ov_landmark_as2 as2_to_landmarks (mode aruco | objects)
 map_streams: 2
-map_stream0_topic: "/drone0/detections/aruco/front"
-map_stream0_type: "aruco"
+map_stream0_topic: "/ov_msckf/landmarks/front"
 map_stream0_cam: "cam3"
-map_stream1_topic: "/drone0/detections/aruco/down"
-map_stream1_type: "aruco"
+map_stream1_topic: "/ov_msckf/landmarks/down"
 map_stream1_cam: "cam2"
 map_aruco_corner_offset: 0
 

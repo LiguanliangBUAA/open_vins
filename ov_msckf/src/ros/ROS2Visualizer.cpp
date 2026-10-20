@@ -58,6 +58,7 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   PRINT_DEBUG("Publishing: %s\n", pub_odombody_map->get_topic_name());
   const UpdaterMapLandmarkOptions map_options = _app->get_params().map_landmark_options;
   T_I_B = map_options.T_I_B;
+  smooth_tau = map_options.smooth_tau;
   if (!map_options.nav_pose_topic.empty()) {
     pub_nav_pose = node->create_publisher<geometry_msgs::msg::PoseStamped>(map_options.nav_pose_topic, 2);
     PRINT_DEBUG("Publishing: %s\n", pub_nav_pose->get_topic_name());
@@ -313,69 +314,48 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
   }
   }
 
-  // Landmark detections, one subscription per map stream (as2 ObjectPerceptionArray)
+  // Landmark detections, one subscription per map stream (ov_landmark_msgs/LandmarkDetectionArray)
   const UpdaterMapLandmarkOptions map_options = _app->get_params().map_landmark_options;
   if (_app->get_state()->_options.use_map_landmarks) {
     aruco_corner_offset = map_options.map_aruco_corner_offset;
     for (int i = 0; i < (int)map_options.streams.size(); i++) {
       const MapStream &st = map_options.streams.at(i);
-      if (st.type == "aruco") {
-        subs_landmarks.push_back(_node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
-            st.topic, rclcpp::SensorDataQoS(),
-            [this, i](const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) { callback_aruco(msg, i); }));
-      } else {
-        subs_landmarks.push_back(_node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
-            st.topic, rclcpp::SensorDataQoS(),
-            [this, i](const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) { callback_objects(msg, i); }));
-      }
-      PRINT_INFO("subscribing to landmarks (%s, %s): %s\n", st.type.c_str(), st.cam.c_str(), st.topic.c_str());
+      subs_landmarks.push_back(_node->create_subscription<ov_landmark_msgs::msg::LandmarkDetectionArray>(
+          st.topic, rclcpp::SensorDataQoS(),
+          [this, i](const ov_landmark_msgs::msg::LandmarkDetectionArray::SharedPtr msg) { callback_landmarks(msg, i); }));
+      PRINT_INFO("subscribing to landmarks (%s): %s\n", st.cam.c_str(), st.topic.c_str());
     }
   }
 }
 
-void ROS2Visualizer::callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream) {
+void ROS2Visualizer::callback_landmarks(const ov_landmark_msgs::msg::LandmarkDetectionArray::SharedPtr msg, int stream) {
   LandmarkObservation obs;
   obs.timestamp = rclcpp::Time(msg->header.stamp).seconds();
   obs.stream = stream;
-  for (const auto &perception : msg->perceptions) {
-    ObjectDetection det;
-    det.type = perception.hypothesis.hypothesis.class_id;
-    det.box_area = perception.bbox.size_x * perception.bbox.size_y;
-    for (size_t k = 0; k < perception.keypoints.size(); k++) {
-      det.keypoints.push_back({0, perception.keypoints.at(k).x, perception.keypoints.at(k).y});
-      det.scores.push_back(k < perception.keypoint_scores.size() ? perception.keypoint_scores.at(k) : 1.0);
-    }
-    obs.objects.push_back(det);
-  }
-  if (!obs.objects.empty()) {
-    _app->feed_measurement_landmarks(obs);
-  }
-}
-
-void ROS2Visualizer::callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg, int stream) {
-  LandmarkObservation obs;
-  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds();
-  obs.stream = stream;
-  for (const auto &perception : msg->perceptions) {
-    int marker_id = 0;
-    try {
-      size_t len = 0;
-      marker_id = std::stoi(perception.hypothesis.hypothesis.class_id, &len);
-      if (len != perception.hypothesis.hypothesis.class_id.size())
+  for (const auto &det : msg->detections) {
+    // ArUco: the marker id gives the landmark id of each corner
+    if (det.type == "aruco" && det.id >= 0) {
+      if (det.keypoints.size() != 4)
         continue;
-    } catch (const std::exception &) {
-      continue;
-    }
-    if (perception.keypoints.size() != 4)
-      continue;
-    for (int c = 0; c < 4; c++) {
-      LandmarkId id = ov_landmark::aruco_corner_id(marker_id, c, aruco_corner_offset);
-      if (id != ov_landmark::INVALID_LANDMARK_ID) {
-        obs.points.push_back({id, perception.keypoints.at(c).x, perception.keypoints.at(c).y});
+      for (int c = 0; c < 4; c++) {
+        LandmarkId id = ov_landmark::aruco_corner_id(det.id, c, aruco_corner_offset);
+        if (id != ov_landmark::INVALID_LANDMARK_ID) {
+          obs.points.push_back({id, det.keypoints.at(c).x, det.keypoints.at(c).y});
+        }
       }
+      continue;
     }
+    // Objects without identity are matched to the map in the filter
+    ObjectDetection od;
+    od.type = det.type;
+    od.box_area = det.box_area;
+    for (const auto &kp : det.keypoints) {
+      od.keypoints.push_back({0, kp.x, kp.y});
+      od.scores.push_back(kp.score);
+    }
+    obs.objects.push_back(od);
   }
-  if (!obs.points.empty()) {
+  if (!obs.points.empty() || !obs.objects.empty()) {
     _app->feed_measurement_landmarks(obs);
   }
 }
@@ -493,8 +473,32 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
   std::shared_ptr<ov_type::PoseJPL> T_MtoG = state->_T_MtoG;
   if (T_MtoG != nullptr) {
 
-    // earth -> ov_odom is ^M T_G, which is exactly the PoseJPL (q_MtoG, p_GinM)
-    geometry_msgs::msg::TransformStamped trans_map = ROSVisualizerHelper::get_stamped_transform_from_pose(_node, T_MtoG, false);
+    // Published base_link pose in M (smoothed if smooth_tau > 0), and the imu pose and T_MtoG consistent with it
+    Eigen::Matrix3d R_MtoB_out, R_MtoI_out;
+    Eigen::Vector3d p_BinM_out, p_IinM_out;
+    {
+      Eigen::Matrix3d R_GtoI = ov_core::quat_2_Rot(state_plus.block(0, 0, 4, 1));
+      Eigen::Vector3d p_IinG = state_plus.block(4, 0, 3, 1);
+      Eigen::Vector3d v_I = state_plus.block(7, 0, 3, 1);
+      Eigen::Vector3d w_I = state_plus.block(10, 0, 3, 1);
+      Eigen::Matrix3d R_ItoB = T_I_B.block<3, 3>(0, 0).transpose();
+      Eigen::Vector3d p_BinI = T_I_B.block<3, 1>(0, 3);
+      Eigen::Matrix3d R_MtoI = R_GtoI * T_MtoG->Rot();
+      R_MtoB_out = R_ItoB * R_MtoI;
+      p_BinM_out = T_MtoG->pos() + T_MtoG->Rot().transpose() * p_IinG + R_MtoI.transpose() * p_BinI;
+      smooth_map_pose(timestamp, R_MtoI.transpose() * (v_I + w_I.cross(p_BinI)), R_ItoB * w_I, R_MtoB_out, p_BinM_out);
+      R_MtoI_out = R_ItoB.transpose() * R_MtoB_out;
+      p_IinM_out = p_BinM_out - R_MtoI_out.transpose() * p_BinI;
+    }
+
+    // earth -> ov_odom is ^M T_G (q_MtoG, p_GinM), here the one that gives the published pose
+    Eigen::Matrix3d R_MtoG_out = ov_core::quat_2_Rot(state_plus.block(0, 0, 4, 1)).transpose() * R_MtoI_out;
+    Eigen::Matrix<double, 7, 1> x_MtoG_out;
+    x_MtoG_out.block(0, 0, 4, 1) = ov_core::rot_2_quat(R_MtoG_out);
+    x_MtoG_out.block(4, 0, 3, 1) = p_IinM_out - R_MtoG_out.transpose() * state_plus.block(4, 0, 3, 1);
+    auto T_MtoG_out = std::make_shared<ov_type::PoseJPL>();
+    T_MtoG_out->set_value(x_MtoG_out);
+    geometry_msgs::msg::TransformStamped trans_map = ROSVisualizerHelper::get_stamped_transform_from_pose(_node, T_MtoG_out, false);
     trans_map.header.stamp = _node->now();
     trans_map.header.frame_id = "earth";
     trans_map.child_frame_id = "drone0/ov_odom";
@@ -506,8 +510,8 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
       Eigen::Vector4d q_GtoI = state_plus.block(0, 0, 4, 1);
       Eigen::Vector3d p_IinG = state_plus.block(4, 0, 3, 1);
       Eigen::Matrix3d R_MtoG = T_MtoG->Rot();
-      Eigen::Vector4d q_MtoI = ov_core::quat_multiply(q_GtoI, T_MtoG->quat());
-      Eigen::Vector3d p_IinM = T_MtoG->pos() + R_MtoG.transpose() * p_IinG;
+      Eigen::Vector4d q_MtoI = ov_core::rot_2_quat(R_MtoI_out);
+      Eigen::Vector3d p_IinM = p_IinM_out;
 
       // Covariance of [imu pose, T_MtoG], with the imu pose block replaced by the fast propagated one
       // NOTE: the imu / T_MtoG cross term is taken at the last update time
@@ -573,8 +577,7 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
       Eigen::Vector3d v_G = R_GtoI.transpose() * v_I;
       Eigen::Vector3d w_x_r = w_I.cross(p_BinI);
 
-      Eigen::Matrix3d R_MtoB = R_ItoB * R_MtoI;
-      Eigen::Vector3d p_BinM = T_MtoG->pos() + R_MtoG.transpose() * p_IinG + R_MtoI.transpose() * p_BinI;
+      Eigen::Vector3d p_BinM = p_BinM_out;
       Eigen::Vector3d v_BinM = R_MtoI.transpose() * (v_I + w_x_r);
       Eigen::Vector3d w_B = R_ItoB * w_I;
 
@@ -608,7 +611,7 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
       Eigen::Matrix<double, 12, 12> cov_y = J * P * J.transpose();
 
       // NOTE: JPL q_MtoB has the same xyzw as the Hamilton orientation of B in M
-      Eigen::Vector4d q_MtoB = ov_core::rot_2_quat(R_MtoB);
+      Eigen::Vector4d q_MtoB = ov_core::rot_2_quat(R_MtoB_out);
       auto stamp = ROSVisualizerHelper::get_time_from_seconds(timestamp);
 
       geometry_msgs::msg::Pose pose_B;
@@ -692,6 +695,24 @@ void ROS2Visualizer::visualize_odometry(double timestamp) {
       mTfBr->sendTransform(trans_calib);
     }
   }
+}
+
+void ROS2Visualizer::smooth_map_pose(double timestamp, const Eigen::Vector3d &v_BinM, const Eigen::Vector3d &w_B, Eigen::Matrix3d &R_MtoB,
+                                     Eigen::Vector3d &p_BinM) {
+  double dt = timestamp - smooth_last_t;
+  if (smooth_tau <= 0.0 || !smooth_init || dt <= 0.0 || dt > 0.5) {
+    smooth_init = (smooth_tau > 0.0);
+  } else {
+    // Predict with the body motion (high frequency), then pull toward the estimate (low frequency)
+    Eigen::Matrix3d R_pred = ov_core::exp_so3(-w_B * dt) * smooth_R_MtoB;
+    Eigen::Vector3d p_pred = smooth_p_BinM + v_BinM * dt;
+    double alpha = 1.0 - std::exp(-dt / smooth_tau);
+    R_MtoB = ov_core::exp_so3(alpha * ov_core::log_so3(R_MtoB * R_pred.transpose())) * R_pred;
+    p_BinM = p_pred + alpha * (p_BinM - p_pred);
+  }
+  smooth_last_t = timestamp;
+  smooth_R_MtoB = R_MtoB;
+  smooth_p_BinM = p_BinM;
 }
 
 void ROS2Visualizer::visualize_final() {
