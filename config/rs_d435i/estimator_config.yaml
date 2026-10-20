@@ -155,13 +155,28 @@ map_aruco_topic: "/drone0/detections/aruco/front"
 map_aruco_cam: "cam3"
 map_aruco_corner_offset: 0
 
+# Object detector (e.g. YOLO): as2 ObjectPerceptionArray, class_id = `type` in the landmark map, keypoints in id order.
+# Detections are matched to map objects by projecting them with the current state. "" = off.
+map_object_topic: ""
+map_match_px: 40.0
+map_match_scale: 0.15
+map_ambiguity_ratio: 1.5
+map_keypoint_conf: 0.5
+map_keypoint_match_px: 25.0
+
 # Landmark update: dry run only prints the reprojection residuals
 map_update_dry_run: true
 map_check_jacobian: false
 map_max_clone_dt: 0.001
 map_sigma_px: 2.0
 map_sigma_landmark_pos_m: 0.05
-map_chi2_multiplier: 1.0
+map_chi2_2d_threshold: 9.21
+# Protections, same as map_alignment_ekf
+map_full_reject_limit: 5
+map_reject_cov_inflation: 4.0
+map_max_consecutive_cov_inflations: 5
+map_all_behind_limit: 5
+map_fatal_on_all_behind: true
 
 # Pose of base_link in the map when VIO initializes (the takeoff pad), row-major 4x4.
 # Converted with imu0.T_i_b from relative_config_imu: ^M T_G = ^M T_B * (^I T_B)^-1 * (^G T_I)^-1

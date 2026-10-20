@@ -180,13 +180,15 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
   // If we are estimating T_MtoG, then create the map landmark updater
   if (state->_options.use_map_landmarks) {
     ov_landmark::LandmarkMap landmark_map;
+    std::vector<ov_landmark::LandmarkObject> objects;
     try {
       landmark_map = ov_landmark::load_landmark_map(params.map_landmark_options.map_landmarks_yaml);
+      objects = ov_landmark::load_landmark_objects(params.map_landmark_options.map_landmarks_yaml);
+      updaterLANDMARK = std::make_shared<UpdaterMapLandmark>(params.map_landmark_options, std::move(landmark_map), std::move(objects));
     } catch (const std::exception &e) {
       PRINT_ERROR(RED "[MAP]: %s\n" RESET, e.what());
       std::exit(EXIT_FAILURE);
     }
-    updaterLANDMARK = std::make_shared<UpdaterMapLandmark>(params.map_landmark_options, std::move(landmark_map));
   }
 }
 

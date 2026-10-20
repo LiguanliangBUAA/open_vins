@@ -3,8 +3,10 @@
 #include <ament_index_cpp/get_package_share_directory.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <map>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -106,6 +108,34 @@ LandmarkMap load_landmark_map(const std::string &yaml_path) {
         throw yaml_error(yaml_path, "no landmarks found");
     }
 
+    return result;
+}
+
+std::vector<LandmarkObject> load_landmark_objects(const std::string &yaml_path) {
+    // load_landmark_map() has already validated id and xyz
+    const YAML::Node landmarks = YAML::LoadFile(yaml_path)["landmarks"];
+
+    std::map<std::string, LandmarkObject> by_name;
+    for (std::size_t index = 0; index < landmarks.size(); ++index) {
+        const YAML::Node item = landmarks[index];
+        if (!item["object"] || !item["type"]) {
+            continue;
+        }
+        LandmarkObject &obj = by_name[item["object"].as<std::string>()];
+        const std::string type = item["type"].as<std::string>();
+        if (!obj.type.empty() && obj.type != type) {
+            throw yaml_error(yaml_path, "object '" + item["object"].as<std::string>() + "' has more than one type");
+        }
+        obj.name = item["object"].as<std::string>();
+        obj.type = type;
+        obj.ids.push_back(item["id"].as<LandmarkId>());
+    }
+
+    std::vector<LandmarkObject> result;
+    for (auto &entry : by_name) {
+        std::sort(entry.second.ids.begin(), entry.second.ids.end());
+        result.push_back(entry.second);
+    }
     return result;
 }
 

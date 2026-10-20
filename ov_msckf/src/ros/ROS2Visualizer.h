@@ -133,6 +133,9 @@ public:
   /// Callback for as2 ArUco detections (map landmarks)
   void callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg);
 
+  /// Callback for object detections without identity, e.g. YOLO (class = landmark object type)
+  void callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg);
+
 protected:
   /// Publish the current state
   void publish_state();
@@ -194,7 +197,7 @@ protected:
   std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> sub_stereo_depth;
 
   // ArUco detections for the map landmark update
-  rclcpp::Subscription<as2_msgs::msg::ObjectPerceptionArray>::SharedPtr sub_aruco;
+  rclcpp::Subscription<as2_msgs::msg::ObjectPerceptionArray>::SharedPtr sub_aruco, sub_objects;
   int aruco_corner_offset = 0;
   double aruco_timeshift = 0.0;
 

@@ -13,6 +13,9 @@ std::string resolve_landmark_map_path(const std::string &yaml_path, const std::s
 // Load known landmark points from the yaml file.
 LandmarkMap load_landmark_map(const std::string &yaml_path);
 
+// Load the objects (points with `object` and `type`) from the same yaml file.
+std::vector<LandmarkObject> load_landmark_objects(const std::string &yaml_path);
+
 } // namespace ov_landmark
 
 #endif //OV_LANDMARK_LANDMARK_MAP_H

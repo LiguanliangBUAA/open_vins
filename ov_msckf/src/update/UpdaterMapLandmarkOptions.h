@@ -79,6 +79,15 @@ struct UpdaterMapLandmarkOptions {
     int map_aruco_corner_offset = 0;
     double map_aruco_timeshift_cam_imu = 0.0;
 
+    /// Object detector input (e.g. YOLO): as2 ObjectPerceptionArray, class_id = landmark object type, keypoints in id order.
+    /// Seen by map_aruco_cam. Objects are matched to the map by projecting them with the current state. Empty = off.
+    std::string map_object_topic = "";
+    double map_match_px = 40.0; // gate on the mean keypoint distance to the predicted object (+ 3 sigma of the prediction)
+    double map_match_scale = 0.15; // + this * sqrt(box area), near objects get more slack
+    double map_ambiguity_ratio = 1.5; // the second best object must cost this much more than the best
+    double map_keypoint_conf = 0.5; // keypoints below this score are ignored
+    double map_keypoint_match_px = 25.0; // a matched keypoint deviating this much from the object's mean shift is dropped
+
     /// ArUco camera calibration from relative_config_imucam, p_C = T_C_I * p_I
     Eigen::Matrix4d aruco_T_C_I = Eigen::Matrix4d::Identity();
     std::shared_ptr<ov_core::CamBase> aruco_camera;
@@ -89,7 +98,12 @@ struct UpdaterMapLandmarkOptions {
     double map_max_clone_dt = 0.001; // use an observation only if a clone is this close in time [s]
     double map_sigma_px = 2.0; // pixel noise of a detected corner
     double map_sigma_landmark_pos_m = 0.05; // position uncertainty of a surveyed landmark point
-    double map_chi2_multiplier = 1.0; // gate: chi2 < multiplier * chi2_0.95(2N)
+    double map_chi2_2d_threshold = 9.21; // per-point gate on the 2D residual (9.21 = 99%)
+    int map_full_reject_limit = 5; // frames in a row with every point rejected before inflating T_MtoG covariance, <= 0 off
+    double map_reject_cov_inflation = 4.0; // covariance inflation factor of T_MtoG
+    int map_max_consecutive_cov_inflations = 5; // inflations allowed without an accepted update in between
+    int map_all_behind_limit = 5; // frames in a row with every point behind the camera
+    bool map_fatal_on_all_behind = true; // exit after map_all_behind_limit such frames
 
     void print(const std::shared_ptr<ov_core::YamlParser> &parser = nullptr) {
         PRINT_DEBUG("MAP LANDMARK PARAMETERS:\n");
@@ -138,12 +152,24 @@ struct UpdaterMapLandmarkOptions {
             parser->parse_config("map_aruco_timeshift_cam_imu", map_aruco_timeshift_cam_imu, false);
             load_aruco_camera(parser);
 
+            parser->parse_config("map_object_topic", map_object_topic, false);
+            parser->parse_config("map_match_px", map_match_px, false);
+            parser->parse_config("map_match_scale", map_match_scale, false);
+            parser->parse_config("map_ambiguity_ratio", map_ambiguity_ratio, false);
+            parser->parse_config("map_keypoint_conf", map_keypoint_conf, false);
+            parser->parse_config("map_keypoint_match_px", map_keypoint_match_px, false);
+
             parser->parse_config("map_update_dry_run", map_update_dry_run, false);
             parser->parse_config("map_check_jacobian", map_check_jacobian, false);
             parser->parse_config("map_max_clone_dt", map_max_clone_dt, false);
             parser->parse_config("map_sigma_px", map_sigma_px, false);
             parser->parse_config("map_sigma_landmark_pos_m", map_sigma_landmark_pos_m, false);
-            parser->parse_config("map_chi2_multiplier", map_chi2_multiplier, false);
+            parser->parse_config("map_chi2_2d_threshold", map_chi2_2d_threshold, false);
+            parser->parse_config("map_full_reject_limit", map_full_reject_limit, false);
+            parser->parse_config("map_reject_cov_inflation", map_reject_cov_inflation, false);
+            parser->parse_config("map_max_consecutive_cov_inflations", map_max_consecutive_cov_inflations, false);
+            parser->parse_config("map_all_behind_limit", map_all_behind_limit, false);
+            parser->parse_config("map_fatal_on_all_behind", map_fatal_on_all_behind, false);
         }
         std::stringstream ss;
         ss << "  - map_initial_T_M_B:" << std::endl << T_M_B_init << std::endl;
@@ -165,10 +191,15 @@ struct UpdaterMapLandmarkOptions {
                    << "x" << aruco_camera->h() << std::endl;
             PRINT_DEBUG(ss_cam.str().c_str());
         }
+        PRINT_DEBUG("  - map_object_topic: %s | match %.0f px + %.2f sqrt(area) | ambiguity %.1f | kpt conf %.2f, %.0f px\n",
+                    map_object_topic.c_str(), map_match_px, map_match_scale, map_ambiguity_ratio, map_keypoint_conf, map_keypoint_match_px);
         PRINT_DEBUG("  - map_update_dry_run: %d | map_check_jacobian: %d | map_max_clone_dt: %.4f s\n", map_update_dry_run,
                     map_check_jacobian, map_max_clone_dt);
-        PRINT_DEBUG("  - map_sigma_px: %.2f | map_sigma_landmark_pos_m: %.3f | map_chi2_multiplier: %.2f\n", map_sigma_px,
-                    map_sigma_landmark_pos_m, map_chi2_multiplier);
+        PRINT_DEBUG("  - map_sigma_px: %.2f | map_sigma_landmark_pos_m: %.3f | map_chi2_2d_threshold: %.2f\n", map_sigma_px,
+                    map_sigma_landmark_pos_m, map_chi2_2d_threshold);
+        PRINT_DEBUG("  - map_full_reject_limit: %d | map_reject_cov_inflation: %.1f | map_max_consecutive_cov_inflations: %d\n",
+                    map_full_reject_limit, map_reject_cov_inflation, map_max_consecutive_cov_inflations);
+        PRINT_DEBUG("  - map_all_behind_limit: %d | map_fatal_on_all_behind: %d\n", map_all_behind_limit, map_fatal_on_all_behind);
     }
 
 private:

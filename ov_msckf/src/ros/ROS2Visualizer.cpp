@@ -322,6 +322,30 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
         map_options.map_aruco_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_aruco, this, std::placeholders::_1));
     PRINT_INFO("subscribing to aruco: %s\n", map_options.map_aruco_topic.c_str());
   }
+  // Object detections without identity (e.g. YOLO), matched to the map inside the filter
+  if (_app->get_state()->_options.use_map_landmarks && !map_options.map_object_topic.empty()) {
+    sub_objects = _node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
+        map_options.map_object_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_objects, this, std::placeholders::_1));
+    PRINT_INFO("subscribing to objects: %s\n", map_options.map_object_topic.c_str());
+  }
+}
+
+void ROS2Visualizer::callback_objects(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) {
+  LandmarkObservation obs;
+  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds() + aruco_timeshift;
+  for (const auto &perception : msg->perceptions) {
+    ObjectDetection det;
+    det.type = perception.hypothesis.hypothesis.class_id;
+    det.box_area = perception.bbox.size_x * perception.bbox.size_y;
+    for (size_t k = 0; k < perception.keypoints.size(); k++) {
+      det.keypoints.push_back({0, perception.keypoints.at(k).x, perception.keypoints.at(k).y});
+      det.scores.push_back(k < perception.keypoint_scores.size() ? perception.keypoint_scores.at(k) : 1.0);
+    }
+    obs.objects.push_back(det);
+  }
+  if (!obs.objects.empty()) {
+    _app->feed_measurement_landmarks(obs);
+  }
 }
 
 void ROS2Visualizer::callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) {
