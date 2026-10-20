@@ -155,6 +155,14 @@ map_aruco_topic: "/drone0/detections/aruco/front"
 map_aruco_cam: "cam3"
 map_aruco_corner_offset: 0
 
+# Landmark update: dry run only prints the reprojection residuals
+map_update_dry_run: true
+map_check_jacobian: false
+map_max_clone_dt: 0.001
+map_sigma_px: 2.0
+map_sigma_landmark_pos_m: 0.05
+map_chi2_multiplier: 1.0
+
 # Pose of base_link in the map when VIO initializes (the takeoff pad), row-major 4x4.
 # Converted with imu0.T_i_b from relative_config_imu: ^M T_G = ^M T_B * (^I T_B)^-1 * (^G T_I)^-1
 map_initial_T_M_B: [ 1.0, 0.0, 0.0, 0.0,

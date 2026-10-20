@@ -83,6 +83,14 @@ struct UpdaterMapLandmarkOptions {
     Eigen::Matrix4d aruco_T_C_I = Eigen::Matrix4d::Identity();
     std::shared_ptr<ov_core::CamBase> aruco_camera;
 
+    /// Landmark update
+    bool map_update_dry_run = true; // only compute and print the residuals
+    bool map_check_jacobian = false; // compare the Jacobian with numerical differences on the first frames
+    double map_max_clone_dt = 0.001; // use an observation only if a clone is this close in time [s]
+    double map_sigma_px = 2.0; // pixel noise of a detected corner
+    double map_sigma_landmark_pos_m = 0.05; // position uncertainty of a surveyed landmark point
+    double map_chi2_multiplier = 1.0; // gate: chi2 < multiplier * chi2_0.95(2N)
+
     void print(const std::shared_ptr<ov_core::YamlParser> &parser = nullptr) {
         PRINT_DEBUG("MAP LANDMARK PARAMETERS:\n");
         if (parser != nullptr) {
@@ -129,6 +137,13 @@ struct UpdaterMapLandmarkOptions {
             
             parser->parse_config("map_aruco_timeshift_cam_imu", map_aruco_timeshift_cam_imu, false);
             load_aruco_camera(parser);
+
+            parser->parse_config("map_update_dry_run", map_update_dry_run, false);
+            parser->parse_config("map_check_jacobian", map_check_jacobian, false);
+            parser->parse_config("map_max_clone_dt", map_max_clone_dt, false);
+            parser->parse_config("map_sigma_px", map_sigma_px, false);
+            parser->parse_config("map_sigma_landmark_pos_m", map_sigma_landmark_pos_m, false);
+            parser->parse_config("map_chi2_multiplier", map_chi2_multiplier, false);
         }
         std::stringstream ss;
         ss << "  - map_initial_T_M_B:" << std::endl << T_M_B_init << std::endl;
@@ -150,6 +165,10 @@ struct UpdaterMapLandmarkOptions {
                    << "x" << aruco_camera->h() << std::endl;
             PRINT_DEBUG(ss_cam.str().c_str());
         }
+        PRINT_DEBUG("  - map_update_dry_run: %d | map_check_jacobian: %d | map_max_clone_dt: %.4f s\n", map_update_dry_run,
+                    map_check_jacobian, map_max_clone_dt);
+        PRINT_DEBUG("  - map_sigma_px: %.2f | map_sigma_landmark_pos_m: %.3f | map_chi2_multiplier: %.2f\n", map_sigma_px,
+                    map_sigma_landmark_pos_m, map_chi2_multiplier);
     }
 
 private:
