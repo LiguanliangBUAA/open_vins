@@ -50,6 +50,8 @@
     <depend condition="$ROS_VERSION == 2">ov_core</depend>
     <depend condition="$ROS_VERSION == 2">ov_init</depend>
     <depend condition="$ROS_VERSION == 2">ov_landmark</depend>
+    <depend condition="$ROS_VERSION == 2">as2_msgs</depend>
+    <depend condition="$ROS_VERSION == 2">vision_msgs</depend>
 
     <!-- System dependencies for both versions -->
     <depend>eigen</depend>

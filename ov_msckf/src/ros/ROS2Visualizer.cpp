@@ -23,6 +23,7 @@
 #include "ROS2Visualizer.h"
 
 #include "core/VioManager.h"
+#include "ov_landmark/ArucoIds.h"
 #include "ros/ROSVisualizerHelper.h"
 #include "sim/Simulator.h"
 #include "state/Propagator.h"
@@ -310,6 +311,43 @@ void ROS2Visualizer::setup_subscribers(std::shared_ptr<ov_core::YamlParser> pars
       PRINT_INFO("subscribing to cam (mono): %s\n", cam_topic.c_str());
     }
   }
+  }
+
+  // ArUco detections from as2 (map landmarks)
+  const UpdaterMapLandmarkOptions map_options = _app->get_params().map_landmark_options;
+  if (_app->get_state()->_options.use_map_landmarks && !map_options.map_aruco_topic.empty()) {
+    aruco_corner_offset = map_options.map_aruco_corner_offset;
+    aruco_timeshift = map_options.map_aruco_timeshift_cam_imu;
+    sub_aruco = _node->create_subscription<as2_msgs::msg::ObjectPerceptionArray>(
+        map_options.map_aruco_topic, rclcpp::SensorDataQoS(), std::bind(&ROS2Visualizer::callback_aruco, this, std::placeholders::_1));
+    PRINT_INFO("subscribing to aruco: %s\n", map_options.map_aruco_topic.c_str());
+  }
+}
+
+void ROS2Visualizer::callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg) {
+  LandmarkObservation obs;
+  obs.timestamp = rclcpp::Time(msg->header.stamp).seconds() + aruco_timeshift;
+  for (const auto &perception : msg->perceptions) {
+    int marker_id = 0;
+    try {
+      size_t len = 0;
+      marker_id = std::stoi(perception.hypothesis.hypothesis.class_id, &len);
+      if (len != perception.hypothesis.hypothesis.class_id.size())
+        continue;
+    } catch (const std::exception &) {
+      continue;
+    }
+    if (perception.keypoints.size() != 4)
+      continue;
+    for (int c = 0; c < 4; c++) {
+      LandmarkId id = ov_landmark::aruco_corner_id(marker_id, c, aruco_corner_offset);
+      if (id != ov_landmark::INVALID_LANDMARK_ID) {
+        obs.points.push_back({id, perception.keypoints.at(c).x, perception.keypoints.at(c).y});
+      }
+    }
+  }
+  if (!obs.points.empty()) {
+    _app->feed_measurement_landmarks(obs);
   }
 }
 

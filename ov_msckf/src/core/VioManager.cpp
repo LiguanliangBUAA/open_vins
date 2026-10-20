@@ -190,6 +190,12 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
   }
 }
 
+void VioManager::feed_measurement_landmarks(const LandmarkObservation &obs) {
+  if (updaterLANDMARK != nullptr) {
+    updaterLANDMARK->feed_observation(obs);
+  }
+}
+
 void VioManager::feed_measurement_imu(const ov_core::ImuData &message) {
 
   // The oldest time we need IMU with is the last clone

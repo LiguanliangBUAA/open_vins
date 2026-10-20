@@ -81,6 +81,9 @@ public:
    */
   void feed_measurement_camera(const ov_core::CameraData &message) { track_image_and_update(message); }
 
+  /// Feed map landmark observations (no-op unless use_map_landmarks)
+  void feed_measurement_landmarks(const LandmarkObservation &obs);
+
   /**
    * @brief Feed function for a synchronized simulated cameras
    * @param timestamp Time that this image was collected

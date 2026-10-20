@@ -22,6 +22,7 @@
 #ifndef OV_MSCKF_ROS2VISUALIZER_H
 #define OV_MSCKF_ROS2VISUALIZER_H
 
+#include <as2_msgs/msg/object_perception_array.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
@@ -129,6 +130,9 @@ public:
                              const sensor_msgs::msg::Image::ConstSharedPtr msg_depth, 
                              int cam_id0, int cam_id1);
 
+  /// Callback for as2 ArUco detections (map landmarks)
+  void callback_aruco(const as2_msgs::msg::ObjectPerceptionArray::SharedPtr msg);
+
 protected:
   /// Publish the current state
   void publish_state();
@@ -188,6 +192,11 @@ protected:
 
   std::shared_ptr<message_filters::Synchronizer<sync_pol_depth>> sync_stereo_depth;
   std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>> sub_stereo_depth;
+
+  // ArUco detections for the map landmark update
+  rclcpp::Subscription<as2_msgs::msg::ObjectPerceptionArray>::SharedPtr sub_aruco;
+  int aruco_corner_offset = 0;
+  double aruco_timeshift = 0.0;
 
   // Live groundtruth subscribers (from simulator topic)
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr sub_gt;

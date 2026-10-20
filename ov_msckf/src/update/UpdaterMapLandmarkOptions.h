@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+#include "cam/CamEqui.h"
+#include "cam/CamRadtan.h"
 #include "ov_landmark/LandmarkMap.h"
 #include "utils/colors.h"
 #include "utils/opencv_yaml_parse.h"
@@ -71,6 +73,16 @@ struct UpdaterMapLandmarkOptions {
         return q;
     }
 
+    /// Aruco perception input
+    std::string map_aruco_topic = "/drone0/detections/aruco/front";
+    std::string map_aruco_cam = "cam3";
+    int map_aruco_corner_offset = 0;
+    double map_aruco_timeshift_cam_imu = 0.0;
+
+    /// ArUco camera calibration from relative_config_imucam, p_C = T_C_I * p_I
+    Eigen::Matrix4d aruco_T_C_I = Eigen::Matrix4d::Identity();
+    std::shared_ptr<ov_core::CamBase> aruco_camera;
+
     void print(const std::shared_ptr<ov_core::YamlParser> &parser = nullptr) {
         PRINT_DEBUG("MAP LANDMARK PARAMETERS:\n");
         if (parser != nullptr) {
@@ -104,6 +116,19 @@ struct UpdaterMapLandmarkOptions {
             parser->parse_config("map_rw_pos_m_sqrt_s", rw_pos_m_sqrt_s, false);
             parser->parse_config("map_nav_pose_topic", nav_pose_topic, false);
             parser->parse_config("map_nav_twist_topic", nav_twist_topic, false);
+
+            parser->parse_config("map_aruco_topic", map_aruco_topic, false);
+            parser->parse_config("map_aruco_cam", map_aruco_cam, false);
+            parser->parse_config("map_aruco_corner_offset", map_aruco_corner_offset, false);
+
+            if (map_aruco_corner_offset < -3 || map_aruco_corner_offset > 3) {
+                PRINT_WARNING(YELLOW "map_aruco_corner_offset = %d is outside [-3, 3], will be wrapped modulo 4\n" RESET,
+                              map_aruco_corner_offset);
+            }
+            map_aruco_corner_offset = ((map_aruco_corner_offset % 4) + 4) % 4;
+            
+            parser->parse_config("map_aruco_timeshift_cam_imu", map_aruco_timeshift_cam_imu, false);
+            load_aruco_camera(parser);
         }
         std::stringstream ss;
         ss << "  - map_initial_T_M_B:" << std::endl << T_M_B_init << std::endl;
@@ -115,9 +140,42 @@ struct UpdaterMapLandmarkOptions {
                     rw_pos_m_sqrt_s);
         PRINT_DEBUG("  - map_nav_pose_topic: %s\n", nav_pose_topic.c_str());
         PRINT_DEBUG("  - map_nav_twist_topic: %s\n", nav_twist_topic.c_str());
+        PRINT_DEBUG("  - map_aruco_topic: %s\n", map_aruco_topic.c_str());
+        PRINT_DEBUG("  - map_aruco_cam: %s | corner_offset %d | timeshift %.4f s\n", map_aruco_cam.c_str(), map_aruco_corner_offset,
+                    map_aruco_timeshift_cam_imu);
+        if (aruco_camera != nullptr) {
+            std::stringstream ss_cam;
+            ss_cam << "  - aruco T_C_I:" << std::endl << aruco_T_C_I << std::endl;
+            ss_cam << "  - aruco intrinsics (fx fy cx cy d0..d3): " << aruco_camera->get_value().transpose() << " | " << aruco_camera->w()
+                   << "x" << aruco_camera->h() << std::endl;
+            PRINT_DEBUG(ss_cam.str().c_str());
+        }
     }
 
 private:
+    void load_aruco_camera(const std::shared_ptr<ov_core::YamlParser> &parser) {
+        parser->parse_external("relative_config_imucam", map_aruco_cam, "T_cam_imu", aruco_T_C_I);
+        check_transform(map_aruco_cam + ".T_cam_imu", aruco_T_C_I);
+
+        std::string dist_model = "radtan";
+        std::vector<double> k = {1, 1, 0, 0};
+        std::vector<double> d = {0, 0, 0, 0};
+        std::vector<int> wh = {1, 1};
+        parser->parse_external("relative_config_imucam", map_aruco_cam, "distortion_model", dist_model);
+        parser->parse_external("relative_config_imucam", map_aruco_cam, "intrinsics", k);
+        parser->parse_external("relative_config_imucam", map_aruco_cam, "distortion_coeffs", d);
+        parser->parse_external("relative_config_imucam", map_aruco_cam, "resolution", wh);
+
+        Eigen::VectorXd calib(8);
+        calib << k.at(0), k.at(1), k.at(2), k.at(3), d.at(0), d.at(1), d.at(2), d.at(3);
+        if (dist_model == "equidistant") {
+            aruco_camera = std::make_shared<ov_core::CamEqui>(wh.at(0), wh.at(1));
+        } else {
+            aruco_camera = std::make_shared<ov_core::CamRadtan>(wh.at(0), wh.at(1));
+        }
+        aruco_camera->set_value(calib);
+    }
+
     static void check_transform(const std::string &name, const Eigen::Matrix4d &T) {
         Eigen::Matrix3d R = T.block(0, 0, 3, 3);
         bool ok = T.row(3).isApprox(Eigen::RowVector4d(0, 0, 0, 1), 1e-8) &&

@@ -8,8 +8,10 @@
 #include "utils/quat_ops.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 
 using namespace ov_core;
@@ -35,19 +37,64 @@ UpdaterMapLandmark::UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, LandmarkM
             static_cast<unsigned int>(min_id), static_cast<unsigned int>(max_id));
     }
 
-void UpdaterMapLandmark::feed_observations(const std::vector<LandmarkObservation> &obs) {
+void UpdaterMapLandmark::feed_observation(const LandmarkObservation &obs) {
+    LandmarkObservation known;
+    known.timestamp = obs.timestamp;
+    for (const auto &p : obs.points) {
+        if (_map.count(p.id) > 0) {
+            known.points.push_back(p);
+        }
+    }
+    if (known.points.empty()) {
+        return;
+    }
     std::lock_guard<std::mutex> lck(_pending_mtx);
-    _pending.insert(_pending.end(), obs.begin(), obs.end());
+    _pending.push_back(known);
+    if (_pending.size() > 100) {
+        _pending.erase(_pending.begin());
+    }
 }
 
 void UpdaterMapLandmark::update(std::shared_ptr<State> state) {
+    std::vector<LandmarkObservation> ready = take_ready(state->_timestamp);
     if (!_initialized) {
         _initialized = try_initialize(state);
         return;
     }
     propagate(state);
 
-    // TODO: landmark measurement update (build_landmark_system + StateHelper::EKFUpdate)
+    for (const auto &obs : ready) {
+        print_observation(state, obs);
+        // TODO: build_landmark_system + StateHelper::EKFUpdate
+    }
+}
+
+std::vector<LandmarkObservation> UpdaterMapLandmark::take_ready(double t) {
+    std::lock_guard<std::mutex> lck(_pending_mtx);
+    std::vector<LandmarkObservation> ready, waiting;
+    for (const auto &obs : _pending) {
+        (obs.timestamp <= t ? ready : waiting).push_back(obs);
+    }
+    _pending.swap(waiting);
+    return ready;
+}
+
+void UpdaterMapLandmark::print_observation(std::shared_ptr<State> state, const LandmarkObservation &obs) {
+    double dt_ms = std::numeric_limits<double>::infinity();
+    for (const auto &clone : state->_clones_IMU) {
+        double dt = 1000.0 * (obs.timestamp - clone.first);
+        if (std::abs(dt) < std::abs(dt_ms)) {
+            dt_ms = dt;
+        }
+    }
+    bool in_window = !state->_clones_IMU.empty() && obs.timestamp >= state->_clones_IMU.begin()->first;
+
+    std::stringstream ids;
+    for (const auto &p : obs.points) {
+        ids << " " << p.id;
+    }
+    PRINT_DEBUG("[MAP]: obs t = %.3f | %zu pts | nearest clone dt = %.1f ms%s | ids:%s\n", obs.timestamp, obs.points.size(), dt_ms,
+                in_window ? "" : " (older than window)", ids.str().c_str());
 }
 
 bool UpdaterMapLandmark::try_initialize(std::shared_ptr<State> state) {

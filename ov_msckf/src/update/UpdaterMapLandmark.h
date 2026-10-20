@@ -26,8 +26,8 @@ class UpdaterMapLandmark {
 public:
     UpdaterMapLandmark(UpdaterMapLandmarkOptions opts, LandmarkMap landmark_map);
 
-    /// Thread-safe: called by ant source (in-process detector or external topic subscriber)
-    void feed_observations(const std::vector<LandmarkObservation> &obs);
+    /// Thread-safe. Points whose id is not in the map are dropped.
+    void feed_observation(const LandmarkObservation &obs);
 
     /// Call once per image after the state is propagated to it: initializes T_MtoG, then propagates it
     void update(std::shared_ptr<State> state);
@@ -38,6 +38,9 @@ private:
     bool try_initialize(std::shared_ptr<State> state);
     /// Random walk of T_MtoG from the last propagation time to the state time
     void propagate(std::shared_ptr<State> state);
+    /// Removes and returns the pending observations not newer than t
+    std::vector<LandmarkObservation> take_ready(double t);
+    void print_observation(std::shared_ptr<State> state, const LandmarkObservation &obs);
     /// Observation to Landmark
     void build_landmark_system(std::shared_ptr<State> state, const LandmarkObservation &ob,
                                Eigen::MatrixXd &H_x, Eigen::VectorXd &res, 

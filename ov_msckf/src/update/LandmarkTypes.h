@@ -17,15 +17,17 @@ using LandmarkMap = ov_landmark::LandmarkMap;
 // Landmark category types
 enum class LandmarkType { ARUCO = 0, WINDOW, PIPE, HOTBOX, COPPER_DISCS, GENERIC };
 
-// Observation of a landmark in camera frame
+// One landmark point seen in the image, raw pixel coordinates
+struct LandmarkPoint {
+    LandmarkId id;
+    double u;
+    double v;
+};
+
+// All landmark points seen in one image
 struct LandmarkObservation {
     double timestamp = -1.0;
-    size_t cam_id = 0;
-
-    int landmark_id = -1;
-    std::vector<Eigen::Vector2d> points_cam;
-
-    double sigma_px = 1.0;
+    std::vector<LandmarkPoint> points;
 };
 
 // Update config for each landmark type

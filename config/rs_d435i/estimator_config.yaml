@@ -150,6 +150,11 @@ use_map_landmarks: true
 # a relative path is relative to this file's folder.
 map_landmarks_yaml: ""
 
+# perception related
+map_aruco_topic: "/drone0/detections/aruco/front"
+map_aruco_cam: "cam3"
+map_aruco_corner_offset: 0
+
 # Pose of base_link in the map when VIO initializes (the takeoff pad), row-major 4x4.
 # Converted with imu0.T_i_b from relative_config_imu: ^M T_G = ^M T_B * (^I T_B)^-1 * (^G T_I)^-1
 map_initial_T_M_B: [ 1.0, 0.0, 0.0, 0.0,
