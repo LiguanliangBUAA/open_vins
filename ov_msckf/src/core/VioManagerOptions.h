@@ -180,7 +180,7 @@ struct VioManagerOptions {
       slam_options.sigma_pix_sq = std::pow(slam_options.sigma_pix, 2);
       aruco_options.sigma_pix_sq = std::pow(aruco_options.sigma_pix, 2);
       parser->parse_config("zupt_chi2_multipler", zupt_options.chi2_multipler);
-      parser->parse_config("use_depth_residual", msckf_options.use_depth_residual);
+      parser->parse_config("use_depth_residual", msckf_options.use_depth_residual, false);
       parser->parse_config("depth_outlier_sigma", msckf_options.depth_outlier_sigma, false);
     }
     PRINT_DEBUG("  Updater MSCKF Feats:\n");
@@ -294,7 +294,7 @@ struct VioManagerOptions {
           std::string mask_node = "mask" + std::to_string(i);
           parser->parse_config(mask_node, mask_path);
           std::string total_mask_path = parser->get_config_folder() + mask_path;
-          if (!boost::filesystem::exists(total_mask_path)) {
+          if (!std::filesystem::exists(total_mask_path)) {
             PRINT_ERROR(RED "VioManager(): invalid mask path:\n" RESET);
             PRINT_ERROR(RED "\t- mask%d - %s\n" RESET, i, total_mask_path.c_str());
             std::exit(EXIT_FAILURE);

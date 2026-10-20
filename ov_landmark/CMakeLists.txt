@@ -11,7 +11,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

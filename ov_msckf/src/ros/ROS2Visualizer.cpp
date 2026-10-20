@@ -136,14 +136,14 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
     }
 
     // If it exists, then delete it
-    if (boost::filesystem::exists(filepath_est))
-      boost::filesystem::remove(filepath_est);
-    if (boost::filesystem::exists(filepath_std))
-      boost::filesystem::remove(filepath_std);
+    if (std::filesystem::exists(filepath_est))
+      std::filesystem::remove(filepath_est);
+    if (std::filesystem::exists(filepath_std))
+      std::filesystem::remove(filepath_std);
 
     // Create folder path to this location if not exists
-    boost::filesystem::create_directories(boost::filesystem::path(filepath_est.c_str()).parent_path());
-    boost::filesystem::create_directories(boost::filesystem::path(filepath_std.c_str()).parent_path());
+    std::filesystem::create_directories(std::filesystem::path(filepath_est.c_str()).parent_path());
+    std::filesystem::create_directories(std::filesystem::path(filepath_std.c_str()).parent_path());
 
     // Open the files
     of_state_est.open(filepath_est.c_str());
@@ -155,9 +155,9 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
 
     // Groundtruth if we are simulating
     if (_sim != nullptr) {
-      if (boost::filesystem::exists(filepath_gt))
-        boost::filesystem::remove(filepath_gt);
-      boost::filesystem::create_directories(boost::filesystem::path(filepath_gt.c_str()).parent_path());
+      if (std::filesystem::exists(filepath_gt))
+        std::filesystem::remove(filepath_gt);
+      std::filesystem::create_directories(std::filesystem::path(filepath_gt.c_str()).parent_path());
       of_state_gt.open(filepath_gt.c_str());
       of_state_gt << "# timestamp(s) q p v bg ba cam_imu_dt num_cam cam0_k cam0_d cam0_rot cam0_trans ... imu_model dw da tg wtoI atoI etc"
                   << std::endl;

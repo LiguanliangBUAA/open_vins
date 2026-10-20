@@ -25,7 +25,7 @@
 #include <Eigen/StdVector>
 #include <algorithm>
 #include <atomic>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <mutex>

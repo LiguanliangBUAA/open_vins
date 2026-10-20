@@ -24,18 +24,11 @@
 
 #include <Eigen/Eigen>
 
-#if ROS_AVAILABLE == 1
-#include <sensor_msgs/PointCloud.h>
-#include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/point_cloud2_iterator.h>
-#include <tf/transform_broadcaster.h>
-#elif ROS_AVAILABLE == 2
 #include <sensor_msgs/msg/point_cloud.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <tf2/transform_datatypes.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-#endif
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 namespace ov_type {
 class PoseJPL;
@@ -53,27 +46,7 @@ class Simulator;
 class ROSVisualizerHelper {
 
 public:
-#if ROS_AVAILABLE == 1
-  /**
-   * @brief Will visualize the system if we have new things
-   * @param feats Vector of features we will convert into ros format
-   * @return ROS pointcloud
-   */
-  static sensor_msgs::PointCloud2 get_ros_pointcloud(const std::vector<Eigen::Vector3d> &feats);
 
-  /**
-   * @brief Given a ov_type::PoseJPL this will convert into the ros format.
-   *
-   * NOTE: frame ids need to be handled externally!
-   *
-   * @param pose Pose with JPL quaternion (e.g. q_GtoI, p_IinG)
-   * @param flip_trans If we should flip / inverse the translation
-   * @return TF of our pose in global (e.g. q_ItoG, p_IinG)
-   */
-  static tf::StampedTransform get_stamped_transform_from_pose(const std::shared_ptr<ov_type::PoseJPL> &pose, bool flip_trans);
-#endif
-
-#if ROS_AVAILABLE == 2
   /**
    * @brief Will visualize the system if we have new things
    * @param node ROS2 node pointer
@@ -117,7 +90,6 @@ public:
     return rclcpp::Time(sec, nsec);
   }
 
-#endif
 
   /**
    * @brief Save current estimate state and groundtruth including calibration

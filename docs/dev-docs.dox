@@ -64,12 +64,12 @@
 4. Go into the documentation folder and build
     - `cd m.css/documentation/`
     - `python3.6 doxygen.py <path_to_Doxyfile-mcss>`
-    - `python3.6 doxygen.py ~/catkin_ws/src/open_vins/Doxyfile-mcss`
+    - `python3.6 doxygen.py ~/ov_ws/src/open_vins/Doxyfile-mcss`
 5. If you run into errors, ensure your python path is set to use the 3.6 libraries
     - ` export PYTHONPATH=/usr/local/lib/python3.6/dist-packages/`
 6. You might need to comment out the `enable_async=True` flag in the doxygen.py file
 7. This should then build the documentation website
-8. Open the html page `~/catkin_ws/src/open_vins/doxgen_generated/html/index.html` to view documentation
+8. Open the html page `~/ov_ws/src/open_vins/doxgen_generated/html/index.html` to view documentation
 
 
 @section developers-theme Custom m.css Theme

@@ -6,12 +6,6 @@ find_package(rclcpp REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(ov_core REQUIRED)
 
-# Describe ROS project
-option(ENABLE_ROS "Enable or disable building with ROS (if it is found)" ON)
-if (NOT ENABLE_ROS)
-    message(FATAL_ERROR "Build with ROS1.cmake if you don't have ROS.")
-endif ()
-add_definitions(-DROS_AVAILABLE=2)
 
 # Include our header files
 include_directories(
@@ -80,7 +74,6 @@ target_link_libraries(test_dynamic_init ov_init_lib ${thirdparty_libraries})
 install(TARGETS test_dynamic_init DESTINATION lib/${PROJECT_NAME})
 
 # Install launch and config directories
-install(DIRECTORY launch/ DESTINATION share/${PROJECT_NAME}/launch/)
 
 # finally define this as the package
 ament_package()

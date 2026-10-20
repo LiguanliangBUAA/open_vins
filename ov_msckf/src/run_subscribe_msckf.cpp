@@ -25,22 +25,11 @@
 #include "core/VioManagerOptions.h"
 #include "utils/dataset_reader.h"
 
-#if ROS_AVAILABLE == 1
-#include "ros/ROS1Visualizer.h"
-#include <ros/ros.h>
-#elif ROS_AVAILABLE == 2
 #include "ros/ROS2Visualizer.h"
 #include <rclcpp/rclcpp.hpp>
-#endif
 
 using namespace ov_msckf;
 
-std::shared_ptr<VioManager> sys;
-#if ROS_AVAILABLE == 1
-std::shared_ptr<ROS1Visualizer> viz;
-#elif ROS_AVAILABLE == 2
-std::shared_ptr<ROS2Visualizer> viz;
-#endif
 
 // Main function
 int main(int argc, char **argv) {
@@ -51,12 +40,6 @@ int main(int argc, char **argv) {
     config_path = argv[1];
   }
 
-#if ROS_AVAILABLE == 1
-  // Launch our ros node
-  ros::init(argc, argv, "run_subscribe_msckf");
-  auto nh = std::make_shared<ros::NodeHandle>("~");
-  nh->param<std::string>("config_path", config_path, config_path);
-#elif ROS_AVAILABLE == 2
   // Launch our ros node
   rclcpp::init(argc, argv);
   rclcpp::NodeOptions options;
@@ -64,15 +47,10 @@ int main(int argc, char **argv) {
   options.automatically_declare_parameters_from_overrides(true);
   auto node = std::make_shared<rclcpp::Node>("run_subscribe_msckf", options);
   node->get_parameter<std::string>("config_path", config_path);
-#endif
 
   // Load the config
   auto parser = std::make_shared<ov_core::YamlParser>(config_path);
-#if ROS_AVAILABLE == 1
-  parser->set_node_handler(nh);
-#elif ROS_AVAILABLE == 2
   parser->set_node(node);
-#endif
 
   // Verbosity
   std::string verbosity = "DEBUG";
@@ -83,14 +61,10 @@ int main(int argc, char **argv) {
   VioManagerOptions params;
   params.print_and_load(parser);
   params.use_multi_threading_subs = true;
-  sys = std::make_shared<VioManager>(params);
-#if ROS_AVAILABLE == 1
-  viz = std::make_shared<ROS1Visualizer>(nh, sys);
+  // Locals, not globals: std::exit() would destruct globals (image_transport) after ROS is gone and segfault
+  auto sys = std::make_shared<VioManager>(params);
+  auto viz = std::make_shared<ROS2Visualizer>(node, sys);
   viz->setup_subscribers(parser);
-#elif ROS_AVAILABLE == 2
-  viz = std::make_shared<ROS2Visualizer>(node, sys);
-  viz->setup_subscribers(parser);
-#endif
 
   // Ensure we read in all parameters required
   if (!parser->successful()) {
@@ -100,30 +74,16 @@ int main(int argc, char **argv) {
 
   // Spin off to ROS
   PRINT_DEBUG("done...spinning to ros\n");
-#if ROS_AVAILABLE == 1
-  // ros::spin();
-  ros::AsyncSpinner spinner(0);
-  spinner.start();
-  ros::waitForShutdown();
-#elif ROS_AVAILABLE == 2
   // rclcpp::spin(node);
   rclcpp::executors::MultiThreadedExecutor executor;
   executor.add_node(node);
   executor.spin();
-#endif
 
   // Final visualization
   viz->visualize_final();
 
+  // Exit without destructing viz: destroying image_transport after the executor stopped segfaults
   fflush(stdout);
-  std::exit(EXIT_SUCCESS);
-
-#if ROS_AVAILABLE == 1
-  ros::shutdown();
-#elif ROS_AVAILABLE == 2
-  rclcpp::shutdown();
-#endif
-
-  // Done!
-  return EXIT_SUCCESS;
+  fflush(stderr);
+  std::_Exit(EXIT_SUCCESS);
 }

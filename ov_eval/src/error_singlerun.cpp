@@ -20,7 +20,7 @@
  */
 
 #include <Eigen/Eigen>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <string>
 
 #include "calc/ResultTrajectory.h"
@@ -91,12 +91,12 @@ int main(int argc, char **argv) {
   if (argc < 4) {
     PRINT_ERROR(RED "ERROR: Please specify a align mode, groudtruth, and algorithm run file\n" RESET);
     PRINT_ERROR(RED "ERROR: ./error_singlerun <align_mode> <file_gt.txt> <file_est.txt>\n" RESET);
-    PRINT_ERROR(RED "ERROR: rosrun ov_eval error_singlerun <align_mode> <file_gt.txt> <file_est.txt>\n" RESET);
+    PRINT_ERROR(RED "ERROR: ros2 run ov_eval error_singlerun <align_mode> <file_gt.txt> <file_est.txt>\n" RESET);
     std::exit(EXIT_FAILURE);
   }
 
   // Load it!
-  boost::filesystem::path path_gt(argv[2]);
+  std::filesystem::path path_gt(argv[2]);
   std::vector<double> times;
   std::vector<Eigen::Matrix<double, 7, 1>> poses;
   std::vector<Eigen::Matrix3d> cov_ori, cov_pos;

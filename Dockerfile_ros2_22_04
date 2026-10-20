@@ -6,14 +6,20 @@ FROM osrf/ros:humble-desktop
 # Are you are looking for how to use this docker file?
 #   - https://docs.openvins.com/dev-docker.html
 #   - https://docs.docker.com/get-started/
-#   - http://wiki.ros.org/docker/Tutorials/Docker
+#   - https://docs.ros.org/en/humble/How-To-Guides/Run-2-nodes-in-single-or-separate-docker-containers.html
 
 # =========================================================
 # =========================================================
 
-# Dependencies we use, catkin tools is very good build system
-# Also some helper utilities for fast in terminal edits (nano etc)
-RUN apt-get update && apt-get install -y libeigen3-dev nano git
+# Dependencies we use, and some helper utilities for fast in terminal edits (nano etc)
+RUN apt-get update && apt-get install -y libeigen3-dev libyaml-cpp-dev nano git ros-humble-vision-msgs
+
+# as2_msgs (Aerostack2) for the map landmark observations. ObjectPerceptionArray is newer than the
+# released ros-humble-as2-msgs, so build it from source in an underlay that the workspace sources.
+RUN mkdir -p /as2_ws/src && cd /as2_ws/src && \
+    git clone --depth 1 https://github.com/aerostack2/aerostack2.git && \
+    cd /as2_ws && . /opt/ros/humble/setup.sh && colcon build --packages-select as2_msgs && \
+    echo "source /as2_ws/install/setup.bash" >> /root/.bashrc
 
 # Ceres solver install and setup
 RUN sudo apt-get install -y cmake libgoogle-glog-dev libgflags-dev libatlas-base-dev libeigen3-dev libsuitesparse-dev libceres-dev
@@ -31,7 +37,6 @@ RUN apt-get update && apt-get install -y python3-dev python3-matplotlib python3-
 
 # Install deps needed for clion remote debugging
 # https://blog.jetbrains.com/clion/2020/01/using-docker-with-clion/
-# RUN sed -i '6i\source "/catkin_ws/install/setup.bash"\' /ros_entrypoint.sh
 RUN apt-get update && apt-get install -y ssh build-essential gcc g++ \
     gdb clang cmake rsync tar python3 && apt-get clean
 RUN ( \

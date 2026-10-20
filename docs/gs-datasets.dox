@@ -210,7 +210,7 @@ We provide [processing scripts](https://github.com/rpng/open_vins/tree/master/ov
     Please be aware of this fact.
 
 We recommend converting the KAIST file format into a ROS bag format.
-If you are using ROS2 then you should first convert into a ROS1 then convert following the @ref dev-ros1-to-ros2 .
+The datasets are distributed as ROS1 bags; convert them with [rosbags](https://gitlab.com/ternaris/rosbags) (`pip install rosbags` then `rosbags-convert <bag>`).
 Follow the instructions on the [kaist2bag](https://github.com/rpng/kaist2bag) repository:
 
 @code{.shell-session}

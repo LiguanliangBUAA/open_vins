@@ -9,15 +9,14 @@
 
 One way (besides inserting timing statements into the code) is to leverage a profiler such as [valgrind](https://www.valgrind.org/).
 This tool allows for recording of the call stack of the system.
-To use this with a ROS node, we can do the following (based on [this](http://wiki.ros.org/roslaunch/Tutorials/Roslaunch%20Nodes%20in%20Valgrind%20or%20GDB) guide):
+To use this with a ROS2 node, run it with a prefix (in a launch file, pass the same string as the `prefix` argument of the `Node`):
 
-- Edit `roslaunch ov_msckf pgeneva_serial_eth.launch` launch file
-- Append `launch-prefix="valgrind --tool=callgrind --callgrind-out-file=/tmp/callgrind.txt"` to your ROS node. This will cause the node to run with valgrind.
-- Change the bag length to be only 10 or so seconds (since profiling is slow)
+- Run the node with `--prefix "valgrind --tool=callgrind --callgrind-out-file=/tmp/callgrind.txt"`. This will cause the node to run with valgrind.
+- Play only 10 or so seconds of the bag (since profiling is slow)
 
 @code{.shell-session}
 sudo apt install valgrind
-roslaunch ov_msckf pgeneva_serial_eth.launch
+ros2 run --prefix "valgrind --tool=callgrind --callgrind-out-file=/tmp/callgrind.txt" ov_msckf run_subscribe_msckf --ros-args -p config_path:=src/open_vins/config/euroc_mav/estimator_config.yaml
 @endcode
 
 After running the profiling program we will want to visualize it.
@@ -44,9 +43,8 @@ One can leverage a profiler such as [valgrind](https://www.valgrind.org/) to per
 Ensure you have installed the `valgrind` package (see above).
 We can change the node launch file as follows:
 
-- Edit `roslaunch ov_msckf pgeneva_serial_eth.launch` launch file
-- Append `launch-prefix="valgrind --tool=memcheck --leak-check=yes"` to your ROS node. This will cause the node to run with valgrind.
-- Change the bag length to be only 10 or so seconds (since profiling is slow)
+- Run the node with `--prefix "valgrind --tool=memcheck --leak-check=yes"` (or the `prefix` argument of the launch `Node`). This will cause the node to run with valgrind.
+- Play only 10 or so seconds of the bag (since profiling is slow)
 
 
 This [page](https://web.stanford.edu/class/archive/cs/cs107/cs107.1206/resources/valgrind.html) has some nice support material for FAQ.
@@ -97,16 +95,16 @@ cmake . && make
 @endcode
 
 We can finally build our ROS package and time how long it takes.
-Note that we are using [catkin tools](https://catkin-tools.readthedocs.io/en/latest/) to build here.
+Note that we are using [colcon](https://colcon.readthedocs.io/) to build here.
 The prefix *CBA* means to run the command in the ClangBuildAnalyzer repository clone folder.
 While the prefix *WS* means run in the root of your ROS workspace.
 
 @code{.shell-session}
 (WS) cd ~/workspace/
-(WS) catkin clean -y && mkdir build
+(WS) rm -rf build install log && mkdir build
 (CBA) ./ClangBuildAnalyzer --start ~/workspace/build/
 (WS) export CC=/usr/bin/clang-11 && export CXX=/usr/bin/clang++-11
-(WS) catkin build ov_msckf -DCMAKE_CXX_FLAGS="-ftime-trace"
+(WS) colcon build --packages-up-to ov_msckf --cmake-args -DCMAKE_CXX_FLAGS="-ftime-trace"
 (CBA) ./ClangBuildAnalyzer --stop ~/workspace/build/ capture_file.bin
 (CBA) ./ClangBuildAnalyzer --analyze capture_file.bin > timing_results.txt
 @endcode

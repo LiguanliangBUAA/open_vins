@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   // Ensure we have a path
   if (argc < 4) {
     PRINT_ERROR(RED "ERROR: ./error_simulation <file_est.txt> <file_std.txt> <file_gt.txt>\n" RESET);
-    PRINT_ERROR(RED "ERROR: rosrun ov_eval error_simulation <file_est.txt> <file_std.txt> <file_gt.txt>\n" RESET);
+    PRINT_ERROR(RED "ERROR: ros2 run ov_eval error_simulation <file_est.txt> <file_std.txt> <file_gt.txt>\n" RESET);
     std::exit(EXIT_FAILURE);
   }
 

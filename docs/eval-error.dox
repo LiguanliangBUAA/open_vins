@@ -38,8 +38,8 @@ By default the EuRoC groundtruth has the timestamp in nanoseconds and the quater
 A user can either process all CSV files in a given folder, or just a specific one.
 
 @code{.shell-session}
-rosrun ov_eval format_converter folder/path/
-rosrun ov_eval format_converter file.csv
+ros2 run ov_eval format_converter folder/path/
+ros2 run ov_eval format_converter file.csv
 @endcode
 
 In addition we have a specific folder structure that is assumed.
@@ -97,8 +97,8 @@ To plot the data we can us the following command which will plot a 2d xy and z-t
 It will use the filename as the name in the legend, so you can change that to change the legend or edit the code.
 
 @code{.shell-session}
-rosrun ov_eval plot_trajectories <align_mode> <file_gt.txt> ... <file_est9.txt>
-rosrun ov_eval plot_trajectories posyaw truths/V1_01_easy.txt 1565371553_estimate.txt
+ros2 run ov_eval plot_trajectories <align_mode> <file_gt.txt> ... <file_est9.txt>
+ros2 run ov_eval plot_trajectories posyaw truths/V1_01_easy.txt 1565371553_estimate.txt
 @endcode
 
 @image html eval/plot_xy.png width=70%
@@ -115,8 +115,8 @@ It also reports to console the average RMSE and RPE values for this run along wi
 To change the RPE distances you will need to edit the code currently.
 
 @code{.shell-session}
-rosrun ov_eval error_singlerun <align_mode> <file_gt.txt> <file_est.txt>
-rosrun ov_eval error_singlerun posyaw 1565371553_estimate.txt truths/V1_01_easy.txt
+ros2 run ov_eval error_singlerun <align_mode> <file_gt.txt> <file_est.txt>
+ros2 run ov_eval error_singlerun posyaw 1565371553_estimate.txt truths/V1_01_easy.txt
 @endcode
 
 Example output:
@@ -153,8 +153,8 @@ In the console it will output the ATE 3D and 2D, along with the 3D RPE and 3D NE
 To change the RPE distances you will need to edit the code currently.
 
 @code{.shell-session}
-rosrun ov_eval error_dataset <align_mode> <file_gt.txt> <folder_algorithms>
-rosrun ov_eval error_dataset posyaw truths/V1_01_easy.txt algorithms/
+ros2 run ov_eval error_dataset <align_mode> <file_gt.txt> <folder_algorithms>
+ros2 run ov_eval error_dataset posyaw truths/V1_01_easy.txt algorithms/
 @endcode
 
 Example output:
@@ -215,8 +215,8 @@ Finally at the end it outputs a nice latex table which can be directly used in a
 To change the RPE distances you will need to edit the code currently.
 
 @code{.shell-session}
-rosrun ov_eval error_comparison <align_mode> <folder_groundtruth> <folder_algorithms>
-rosrun ov_eval error_comparison posyaw truths/ algorithms/
+ros2 run ov_eval error_comparison <align_mode> <folder_groundtruth> <folder_algorithms>
+ros2 run ov_eval error_comparison posyaw truths/ algorithms/
 @endcode
 
 Example output:

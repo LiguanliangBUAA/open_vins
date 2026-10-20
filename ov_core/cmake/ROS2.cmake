@@ -5,12 +5,6 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(cv_bridge REQUIRED)
 
-# Describe ROS project
-option(ENABLE_ROS "Enable or disable building with ROS (if it is found)" ON)
-if (NOT ENABLE_ROS)
-    message(FATAL_ERROR "Build with ROS1.cmake if you don't have ROS.")
-endif ()
-add_definitions(-DROS_AVAILABLE=2)
 
 # Include our header files
 include_directories(
@@ -65,12 +59,6 @@ ament_export_libraries(ov_core_lib)
 ##################################################
 # Make binary files!
 ##################################################
-
-# TODO: UPGRADE THIS TO ROS2 AS ANOTHER FILE!!
-#if (catkin_FOUND AND ENABLE_ROS)
-#    add_executable(test_tracking src/test_tracking.cpp)
-#    target_link_libraries(test_tracking ov_core_lib ${thirdparty_libraries})
-#endif ()
 
 add_executable(test_webcam src/test_webcam.cpp)
 ament_target_dependencies(test_webcam rclcpp cv_bridge)

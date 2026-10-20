@@ -109,13 +109,13 @@ VioManager::VioManager(VioManagerOptions &params_) : thread_init_running(false),
   // If we are recording statistics, then open our file
   if (params.record_timing_information) {
     // If the file exists, then delete it
-    if (boost::filesystem::exists(params.record_timing_filepath)) {
-      boost::filesystem::remove(params.record_timing_filepath);
+    if (std::filesystem::exists(params.record_timing_filepath)) {
+      std::filesystem::remove(params.record_timing_filepath);
       PRINT_INFO(YELLOW "[STATS]: found old file found, deleted...\n" RESET);
     }
     // Create the directory that we will open the file in
-    boost::filesystem::path p(params.record_timing_filepath);
-    boost::filesystem::create_directories(p.parent_path());
+    std::filesystem::path p(params.record_timing_filepath);
+    std::filesystem::create_directories(p.parent_path());
     // Open our statistics file!
     of_statistics.open(params.record_timing_filepath, std::ofstream::out | std::ofstream::app);
     // Write the header information into it

@@ -53,8 +53,8 @@ The file should be comma separated format, with the first column being the timin
 The middle columns should describe how much each component takes (whose names are extracted from the header of the csv file).
 
 @code{.shell-session}
-rosrun ov_eval timing_flamegraph <file_times.txt>
-rosrun ov_eval timing_flamegraph timing_mono_ethV101.txt
+ros2 run ov_eval timing_flamegraph <file_times.txt>
+ros2 run ov_eval timing_flamegraph timing_mono_ethV101.txt
 @endcode
 
 Example output:
@@ -81,8 +81,8 @@ The file should be comma separated format, with the first column being the timin
 The middle columns should describe how much each component takes (whose names are extracted from the header of the csv file).
 
 @code{.shell-session}
-rosrun ov_eval timing_histogram <file_times.txt> <num_bins>
-rosrun ov_eval timing_histogram timing_mono_ethV101.txt 75
+ros2 run ov_eval timing_histogram <file_times.txt> <num_bins>
+ros2 run ov_eval timing_histogram timing_mono_ethV101.txt 75
 @endcode
 
 
@@ -98,8 +98,8 @@ The file should be comma separated format, with the first column being the timin
 The middle columns should describe how much each component takes (whose names are extracted from the header of the csv file).
 
 @code{.shell-session}
-rosrun ov_eval timing_comparison <file_times1.txt> ... <file_timesN.txt>
-rosrun ov_eval timing_comparison timing_mono_ethV101.txt timing_stereo_ethV101.txt
+ros2 run ov_eval timing_comparison <file_times1.txt> ... <file_timesN.txt>
+ros2 run ov_eval timing_comparison timing_mono_ethV101.txt timing_stereo_ethV101.txt
 @endcode
 
 Example output:
@@ -155,8 +155,8 @@ psutil_logs/
 
 
 @code{.shell-session}
-rosrun ov_eval timing_percentages <timings_folder>
-rosrun ov_eval timing_percentages psutil_logs/
+ros2 run ov_eval timing_percentages <timings_folder>
+ros2 run ov_eval timing_percentages psutil_logs/
 @endcode
 
 Example output:
